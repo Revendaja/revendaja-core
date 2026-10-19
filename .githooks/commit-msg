@@ -1,0 +1,4 @@
+#!/bin/sh
+# Conventional Commits (config do backend) para todo o monorepo.
+msg="$(cd "$(dirname "$1")" && pwd)/$(basename "$1")"
+cd revendaja-backend-1.0 && npx --no -- commitlint --edit "$msg"

@@ -1,0 +1,5 @@
+#!/bin/sh
+# Roda lint-staged do backend quando há arquivos do backend no commit.
+if git diff --cached --name-only | grep -q '^revendaja-backend-1.0/'; then
+  cd revendaja-backend-1.0 && npx --no -- lint-staged
+fi

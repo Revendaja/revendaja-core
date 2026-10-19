@@ -1,0 +1,106 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  backend:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: revendaja-backend-1.0
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: revendaja
+          POSTGRES_PASSWORD: revendaja
+          POSTGRES_DB: revendaja
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U revendaja"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 5
+    env:
+      DATABASE_URL: postgresql://revendaja:revendaja@localhost:5432/revendaja?schema=public
+      JWT_SECRET: ci-only-secret-not-used-in-production
+      NODE_ENV: test
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: revendaja-backend-1.0/package-lock.json
+      - run: npm ci
+      - run: npx prisma generate
+      - run: npm run lint
+      - run: npm run typecheck
+      - run: npm run test -- --coverage
+      - run: npm run build
+      - name: Audit de dependências (bloqueia em high/critical)
+        run: npm audit --omit=dev --audit-level=high
+
+  web:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: revendaja-web-1.0
+    env:
+      NEXT_PUBLIC_API_URL: http://localhost:3000
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: revendaja-web-1.0/package-lock.json
+      - run: npm ci
+      - run: npm run lint
+      - run: npm run test
+      - run: npm run build
+      - name: Audit de dependências (bloqueia em high/critical)
+        run: npm audit --omit=dev --audit-level=high
+
+  mobile:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: revendaja-mobile-1.0
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: revendaja-mobile-1.0/package-lock.json
+      - run: npm ci
+      - run: npx tsc --noEmit
+      # TODO: hoje há 41 vulnerabilidades (1 critical, 26 high), em sua maioria transitivas do Expo.
+      # Quando zerar os high/critical, remova o continue-on-error para o audit passar a bloquear.
+      - name: Audit de dependências (ainda não bloqueia)
+        continue-on-error: true
+        run: npm audit --omit=dev --audit-level=high
+
+  secrets:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Gitleaks (bloqueia se achar segredo)
+        run: |
+          curl -sSfL https://github.com/gitleaks/gitleaks/releases/download/v8.21.2/gitleaks_8.21.2_linux_x64.tar.gz | tar -xz gitleaks
+          ./gitleaks detect --source . --redact --no-banner --verbose
