@@ -1,0 +1,67 @@
+@import "tailwindcss";
+
+/* Paleta igual ao app mobile (NativeWind) — mesma marca nas duas plataformas. */
+@theme {
+  --color-primary-50: #fff3e9;
+  --color-primary-100: #ffe4cc;
+  --color-primary-200: #ffc89c;
+  --color-primary-300: #ffa65e;
+  --color-primary-400: #ff8b33;
+  --color-primary-500: #ff6b00;
+  --color-primary-600: #e05f00;
+  --color-primary-700: #b84c00;
+  --color-primary-800: #8f3b00;
+  --color-primary-900: #6b2c00;
+
+  /* Fundo da página/sidebar (cinza neutro); o painel principal é branco por cima. */
+  --color-canvas: #f4f4f5;
+
+  --color-ink-50: #f5f6fa;
+  --color-ink-100: #e7e8f2;
+  --color-ink-200: #d3d5e3;
+  --color-ink-300: #b4b7c9;
+  --color-ink-400: #8b8fa3;
+  --color-ink-500: #6b7089;
+  --color-ink-600: #4f5264;
+  --color-ink-700: #3a3d4d;
+  --color-ink-800: #262833;
+  --color-ink-900: #1a1b25;
+
+  --color-success: #1faa59;
+  --color-success-soft: #e4f7eb;
+  --color-warning: #e0952b;
+  --color-warning-soft: #fcf1df;
+  --color-danger: #e0453f;
+  --color-danger-soft: #fceae9;
+
+  --radius-xl2: 20px;
+
+  --font-sans: var(--font-inter), system-ui, sans-serif;
+}
+
+body {
+  background: var(--color-ink-50);
+  color: var(--color-ink-900);
+}
+
+/* Entrada suave de itens de lista (usada nas notificações). */
+@keyframes fade-up {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.animate-fade-up {
+  animation: fade-up 0.35s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .animate-fade-up {
+    animation: none;
+  }
+}

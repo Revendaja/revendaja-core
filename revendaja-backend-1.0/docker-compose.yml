@@ -1,0 +1,21 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: revendaja-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: revendaja
+      POSTGRES_PASSWORD: revendaja
+      POSTGRES_DB: revendaja
+    ports:
+      - '5432:5432'
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U revendaja']
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+volumes:
+  postgres_data:

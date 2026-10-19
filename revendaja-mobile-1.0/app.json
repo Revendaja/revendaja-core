@@ -1,0 +1,61 @@
+{
+  "expo": {
+    "name": "RevendaJá",
+    "slug": "revendaja-mobile-10",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "icon": "./assets/icon.png",
+    "userInterfaceStyle": "light",
+    "ios": {
+      "supportsTablet": true
+    },
+    "android": {
+      "adaptiveIcon": {
+        "backgroundColor": "#FF6B00",
+        "foregroundImage": "./assets/android-icon-foreground.png",
+        "backgroundImage": "./assets/android-icon-background.png",
+        "monochromeImage": "./assets/android-icon-monochrome.png"
+      },
+      "predictiveBackGestureEnabled": false,
+      "permissions": [
+        "android.permission.CAMERA",
+        "android.permission.RECORD_AUDIO"
+      ],
+      "package": "com.szreactioon.revendajamobile10",
+      "googleServicesFile": "./google-services.json"
+    },
+    "web": {
+      "favicon": "./assets/favicon.png"
+    },
+    "plugins": [
+      [
+        "expo-camera",
+        {
+          "cameraPermission": "O RevendaJá usa a câmera para escanear o código de barras dos produtos."
+        }
+      ],
+      [
+        "expo-image-picker",
+        {
+          "photosPermission": "O RevendaJá acessa suas fotos para você adicionar a imagem do produto.",
+          "cameraPermission": "O RevendaJá usa a câmera para você fotografar o produto."
+        }
+      ],
+      "expo-secure-store",
+      [
+        "expo-notifications",
+        {
+          "icon": "./assets/android-notifications.png",
+          "color": "#fa3d02"
+        }
+      ],
+      "@react-native-google-signin/google-signin"
+    ],
+    "extra": {
+      "eas": {
+        "projectId": "61f9a80d-e0c5-4678-82c7-c2c7c9b86afd"
+      }
+    },
+    "owner": "szreactioon"
+  }
+}

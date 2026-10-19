@@ -1,0 +1,98 @@
+[
+  {
+    "id": 1,
+    "name": "Natura",
+    "logo": "https://revendaja-catalogo.s3.us-east-2.amazonaws.com/estoqueproprio/brands/logo-natura.png",
+    "fromCatalog": true,
+    "fullCatalog": true,
+    "ownerId": null,
+    "companyId": null,
+    "profitability": 30,
+    "createdAt": "2023-06-24T00:49:22.460Z",
+    "updatedAt": "2023-06-24T00:49:22.460Z"
+  },
+  {
+    "id": 2,
+    "name": "Avon",
+    "logo": "https://revendaja-catalogo.s3.us-east-2.amazonaws.com/estoqueproprio/brands/logo-avon.png",
+    "fromCatalog": true,
+    "fullCatalog": true,
+    "ownerId": null,
+    "companyId": null,
+    "profitability": 30,
+    "createdAt": "2023-06-24T00:49:22.460Z",
+    "updatedAt": "2023-06-24T00:49:22.460Z"
+  },
+  {
+    "id": 4,
+    "name": "Jequiti",
+    "logo": "https://revendaja-catalogo.s3.us-east-2.amazonaws.com/estoqueproprio/brands/logo-jequiti.png",
+    "fromCatalog": true,
+    "fullCatalog": true,
+    "ownerId": null,
+    "companyId": null,
+    "profitability": 30,
+    "createdAt": "2023-06-24T00:49:22.460Z",
+    "updatedAt": "2023-06-24T00:49:22.460Z"
+  },
+  {
+    "id": 5,
+    "name": "Eudora",
+    "logo": "https://revendaja-catalogo.s3.us-east-2.amazonaws.com/estoqueproprio/brands/logo-eudora.png",
+    "fromCatalog": true,
+    "fullCatalog": true,
+    "ownerId": null,
+    "companyId": null,
+    "profitability": 30,
+    "createdAt": "2023-06-24T00:49:22.460Z",
+    "updatedAt": "2023-06-24T00:49:22.460Z"
+  },
+  {
+    "id": 7,
+    "name": "O Boticário",
+    "logo": "https://revendaja-catalogo.s3.us-east-2.amazonaws.com/estoqueproprio/brands/logo-oboticario.png",
+    "fromCatalog": true,
+    "fullCatalog": true,
+    "ownerId": null,
+    "companyId": null,
+    "profitability": 15,
+    "createdAt": "2023-06-24T00:49:22.460Z",
+    "updatedAt": "2023-06-24T00:49:22.460Z"
+  },
+  {
+    "id": 57,
+    "name": "Quem Disse, Berenice?",
+    "logo": "https://revendaja-catalogo.s3.us-east-2.amazonaws.com/estoqueproprio/brands/logo-quem-disse-berenice.png",
+    "fromCatalog": true,
+    "fullCatalog": true,
+    "ownerId": null,
+    "companyId": null,
+    "profitability": 15,
+    "createdAt": "2023-07-30T04:40:59.652Z",
+    "updatedAt": "2023-07-30T04:40:59.652Z"
+  },
+  {
+    "id": 83,
+    "name": "Hinode",
+    "logo": "https://revendaja-catalogo.s3.us-east-2.amazonaws.com/estoqueproprio/brands/logo-hinode.png",
+    "fromCatalog": true,
+    "fullCatalog": true,
+    "ownerId": null,
+    "companyId": null,
+    "profitability": 50,
+    "createdAt": "2023-09-04T00:09:53.334Z",
+    "updatedAt": "2023-09-04T00:09:53.334Z"
+  },
+  {
+    "id": 222,
+    "name": "O.U.i",
+    "logo": "https://revendaja-catalogo.s3.us-east-2.amazonaws.com/estoqueproprio/brands/o.u.i.jpg",
+    "fromCatalog": true,
+    "fullCatalog": true,
+    "ownerId": null,
+    "companyId": null,
+    "profitability": 15,
+    "createdAt": "2023-11-22T03:58:40.270Z",
+    "updatedAt": "2023-11-22T03:58:40.270Z"
+  }
+]

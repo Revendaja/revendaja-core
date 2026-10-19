@@ -1,0 +1,500 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+enum Role {
+  user
+  admin
+}
+
+model User {
+  id   String @id @default(uuid())
+  name String
+  email String @unique
+  // Ausente só em conta criada via Google que ainda não completou o cadastro
+  // (a usuária informa o WhatsApp depois, numa tela de completar perfil).
+  whatsapp String? @unique
+  // Ausente quando a conta só tem login via Google (nunca criou senha própria).
+  passwordHash String? @map("password_hash")
+  // Id estável do Google (claim `sub` do ID token). Presente só em conta que já logou com Google
+  // pelo menos uma vez — inclusive uma conta antiga de e-mail/senha que depois vinculou o Google.
+  googleId        String?   @unique @map("google_id")
+  phoneVerifiedAt DateTime? @map("phone_verified_at")
+  // Papel de acesso. Toda conta nasce `user`; virar `admin` é uma operação manual
+  // (banco/seed), não existe rota para isso — evita criar uma superfície de ataque nova.
+  role            Role      @default(user)
+  createdAt       DateTime  @default(now()) @map("created_at")
+
+  otpCodes           OtpCode[]
+  store              Store?
+  session            Session?
+  passwordResetCodes PasswordResetCode[]
+  pushTokens         PushToken[]
+  notifications      Notification[]
+
+  @@map("users")
+}
+
+/// Sessão ativa de uma conta. `userId` é `@unique` de propósito: só existe UMA
+/// sessão por usuária, garantido pelo próprio banco. Um novo login troca o `id`
+/// da sessão existente (ver `sessionsRepository.replaceForUser`), e como todo
+/// token carrega o `id` da sessão (claim `sid`), os tokens do login anterior
+/// deixam de valer na hora — o dispositivo antigo cai no próximo request.
+model Session {
+  id        String   @id @default(uuid())
+  userId    String   @unique @map("user_id")
+  expiresAt DateTime @map("expires_at")
+  createdAt DateTime @default(now()) @map("created_at")
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("sessions")
+}
+
+/// Código de 6 dígitos de "esqueci minha senha", enviado por e-mail (o app não
+/// usa link). Só guardamos o hash bcrypt: quem lê o banco não descobre o código.
+/// 6 dígitos são fáceis de adivinhar, então há defesas em camadas: validade
+/// curta (`expiresAt`), limite de tentativas por código (`attempts`, contado de
+/// forma atômica no UPDATE) e uso único (`usedAt`, também marca os invalidados).
+model PasswordResetCode {
+  id        String    @id @default(uuid())
+  userId    String    @map("user_id")
+  codeHash  String    @map("code_hash")
+  expiresAt DateTime  @map("expires_at")
+  attempts  Int       @default(0)
+  usedAt    DateTime? @map("used_at")
+  createdAt DateTime  @default(now()) @map("created_at")
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@map("password_reset_codes")
+}
+
+model OtpCode {
+  id         String    @id @default(uuid())
+  userId     String    @map("user_id")
+  codeHash   String    @map("code_hash")
+  expiresAt  DateTime  @map("expires_at")
+  attempts   Int       @default(0)
+  consumedAt DateTime? @map("consumed_at")
+  createdAt  DateTime  @default(now()) @map("created_at")
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@map("otp_codes")
+}
+
+enum Plan {
+  free
+  starter
+  premium
+  business
+}
+
+model Store {
+  id                      String          @id @default(uuid())
+  userId                  String          @unique @map("user_id")
+  storeName               String          @map("store_name")
+  handle                  String          @unique
+  catalogLink             String          @map("catalog_link")
+  isOnline                Boolean         @default(true) @map("is_online")
+  // Descrição curta da loja: aparece no topo da vitrine e é editada em "Editar Loja". Opcional.
+  bio                     String?
+  // Última numeração de venda usada (Venda #N). Incrementado dentro da transação
+  // da venda: o UPDATE trava a linha da loja, então duas vendas simultâneas nunca
+  // recebem o mesmo número.
+  saleCounter             Int             @default(0) @map("sale_counter")
+  // Meta de faturamento mensal (card "Meta de Vendas" da Home). Opcional: null =
+  // "sem meta definida" — a API não inventa um valor padrão.
+  monthlyGoal             Decimal?        @map("monthly_goal") @db.Decimal(12, 2)
+  // Plano da loja (badge da Home). Toda loja começa no Free. Não há rota para trocar
+  // de plano: a mudança virá junto com a cobrança/assinatura.
+  plan                    Plan            @default(free)
+  // Formas de pagamento que a vitrine aceita (tela Mais). Nunca inclui fiado: só pix, card e cash.
+  acceptedPaymentMethods  PaymentMethod[] @default([pix, card, cash]) @map("accepted_payment_methods")
+  // Esconde da vitrine o produto com estoque zerado (tela Mais).
+  hideOutOfStock          Boolean         @default(true) @map("hide_out_of_stock")
+  // Estoque mínimo aplicado a cada NOVO produto que a loja adicionar (catálogo ou manual), editado
+  // em "Editar Loja". 0 = sem padrão (o produto nasce com o alerta desligado, como sempre foi).
+  // Trocar esse valor também atualiza quem JÁ está na loja e ainda segue o padrão ANTIGO (produto
+  // que a loja nunca configurou um mínimo próprio) — não toca em quem já tem um `minStock` próprio,
+  // diferente do padrão anterior (ver StoreService#updateStore).
+  defaultMinStock         Int             @default(0) @map("default_min_stock")
+  // Última vez que a loja recebeu a notificação promocional automática (a cada N dias, ver
+  // NOTIFICATION_PROMOTION_INTERVAL_DAYS). Null = nunca notificada (usa createdAt como referência).
+  lastPromotionNotifiedAt DateTime?       @map("last_promotion_notified_at")
+  // Cobrança (Stripe). Tudo opcional: loja no plano Gratuito nunca tem cliente/assinatura. `plan`
+  // acima continua sendo a fonte do que a loja pode usar — só os webhooks da Stripe o alteram.
+  // Personalização da vitrine pública (banners, textos, coleções). SÓ o que a loja alterou: o que
+  // ficou de fora usa o padrão (ver storefront.config.ts). Null = tudo no padrão.
+  storefrontConfig        Json?           @map("storefront_config")
+  stripeCustomerId        String?         @unique @map("stripe_customer_id")
+  stripeSubscriptionId    String?         @unique @map("stripe_subscription_id")
+  // Status da assinatura na Stripe (active, trialing, past_due, canceled...). Null = nunca assinou.
+  subscriptionStatus      String?         @map("subscription_status")
+  // Fim do ciclo atual: é quando renova (ou quando o acesso termina, se cancelAtPeriodEnd).
+  currentPeriodEnd        DateTime?       @map("current_period_end")
+  cancelAtPeriodEnd       Boolean         @default(false) @map("cancel_at_period_end")
+  createdAt               DateTime        @default(now()) @map("created_at")
+
+  user              User                    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  storeProducts     StoreProduct[]
+  storeCategories   StoreCategory[]
+  sales             Sale[]
+  visits            StoreVisit[]
+  goalNotifications StoreGoalNotification[]
+
+  @@map("stores")
+}
+
+/// Marca de um produto (ex.: Natura, Avon). Marcas do catálogo global têm
+/// `fromCatalog = true` e `ownerId/companyId` nulos; uma marca própria de uma
+/// loja (produto fora do catálogo) usaria esses campos no futuro.
+model Brand {
+  id            Int      @id @default(autoincrement())
+  name          String
+  logo          String?
+  fromCatalog   Boolean  @default(true) @map("from_catalog")
+  fullCatalog   Boolean  @default(true) @map("full_catalog")
+  ownerId       String?  @map("owner_id")
+  companyId     String?  @map("company_id")
+  profitability Int      @default(0)
+  createdAt     DateTime @default(now()) @map("created_at")
+  updatedAt     DateTime @updatedAt @map("updated_at")
+
+  products Product[]
+
+  @@map("brands")
+}
+
+/// Produto do catálogo global (fonte única, compartilhada por todas as lojas).
+/// `basePrice` é o preço sugerido do catálogo — cada loja define o próprio
+/// preço ao importar o produto (ver `StoreProduct.price`).
+model Product {
+  id             Int      @id @default(autoincrement())
+  name           String
+  barCode        String?  @map("bar_code")
+  brandSku       String?  @map("brand_sku")
+  description    String?
+  gender         String?
+  productImage   String?  @map("product_image")
+  productImageSm String?  @map("product_image_sm")
+  brandId        Int      @map("brand_id")
+  basePrice      Decimal  @map("base_price") @db.Decimal(10, 2)
+  createdAt      DateTime @default(now()) @map("created_at")
+  updatedAt      DateTime @updatedAt @map("updated_at")
+
+  brand         Brand          @relation(fields: [brandId], references: [id])
+  storeProducts StoreProduct[]
+
+  @@index([brandId])
+  @@map("products")
+}
+
+enum StoreProductKind {
+  catalog
+  manual
+}
+
+/// Categoria própria de uma loja (ex.: "Perfumaria", "Cestas de presente"), criada livremente pela
+/// consultora — não é uma lista fixa da plataforma. Um produto sem categoria (`categoryId = null`)
+/// continua aparecendo normalmente, só não entra em nenhum filtro de categoria.
+model StoreCategory {
+  id        String   @id @default(uuid())
+  storeId   String   @map("store_id")
+  name      String
+  createdAt DateTime @default(now()) @map("created_at")
+
+  store    Store          @relation(fields: [storeId], references: [id], onDelete: Cascade)
+  products StoreProduct[]
+
+  @@unique([storeId, name])
+  @@map("store_categories")
+}
+
+/// Vínculo entre uma loja e um produto: ou "a loja importou este produto do
+/// catálogo" (`kind = catalog`, `productId` preenchido, nome/imagem vêm de
+/// `Product`), ou "a loja cadastrou um produto próprio" (`kind = manual`,
+/// `productId` nulo, nome/descrição/imagem ficam nos campos abaixo — ex. um
+/// ursinho ou uma cesta de presente). Cada loja tem seu próprio `price` para
+/// o mesmo `Product` — é assim que o mesmo produto pode ter preços totalmente
+/// diferentes em lojas diferentes. `isActive` permite a loja remover o
+/// produto da própria vitrine sem perder o preço configurado. `stock` é a
+/// quantidade em estoque que a loja tem daquele produto (nunca negativa: a
+/// validação está na API).
+model StoreProduct {
+  id                 String           @id @default(uuid())
+  storeId            String           @map("store_id")
+  productId          Int?             @map("product_id")
+  categoryId         String?          @map("category_id")
+  kind               StoreProductKind @default(catalog)
+  // Só usados quando `kind = manual`.
+  name               String?
+  description        String?
+  image              String?
+  price              Decimal          @db.Decimal(10, 2)
+  // Preço de custo (o que a loja pagou). Opcional: null = "não informado".
+  costPrice          Decimal?         @map("cost_price") @db.Decimal(10, 2)
+  // Preço promocional temporário. Os dois campos abaixo sempre vêm juntos (os dois nulos = sem
+  // promoção, os dois preenchidos = em promoção até `promoEndsAt`) — validado na API, não no banco.
+  // "Ainda vale?" é calculado na leitura (`promoEndsAt > agora`), sem rotina de limpeza.
+  promoPrice         Decimal?         @map("promo_price") @db.Decimal(10, 2)
+  promoEndsAt        DateTime?        @map("promo_ends_at")
+  stock              Int              @default(0)
+  // Estoque mínimo configurado pela loja para este produto. 0 = alerta de estoque baixo desligado
+  // (padrão de todo produto existente, até a loja configurar um valor).
+  minStock           Int              @default(0) @map("min_stock")
+  // Marca quando a notificação de estoque baixo já foi enviada para este produto: evita repetir a
+  // cada varredura. Volta a `null` quando o estoque sobe de novo acima de `minStock`, liberando um
+  // novo alerta na próxima vez que cair.
+  lowStockNotifiedAt DateTime?        @map("low_stock_notified_at")
+  isActive           Boolean          @default(true) @map("is_active")
+  // Congelado = passa do limite de produtos do plano atual (a loja desceu de plano). Some da vitrine
+  // e não vende online, mas continua na loja e pode ser apagado. Ao ficar dentro do limite (apagou
+  // produtos ou fez upgrade) volta sozinho. Mantido por `reconcileFrozenProducts`: ficam ativos os
+  // mais antigos, até o limite do plano. Independe de `isActive` (essa é a escolha da loja).
+  frozen             Boolean          @default(false)
+  createdAt          DateTime         @default(now()) @map("created_at")
+  updatedAt          DateTime         @updatedAt @map("updated_at")
+
+  store           Store                   @relation(fields: [storeId], references: [id], onDelete: Cascade)
+  product         Product?             @relation(fields: [productId], references: [id], onDelete: Cascade)
+  category        StoreCategory?          @relation(fields: [categoryId], references: [id], onDelete: SetNull)
+  saleItems       SaleItem[]
+  // Componentes deste produto quando ele é um "kit" (ex.: a cesta contém estes produtos).
+  components      StoreProductComponent[] @relation("KitComponents")
+  // Kits dos quais este produto participa como componente.
+  partOfKits      StoreProductComponent[] @relation("ComponentOfKits")
+  consumedInSales SaleItemComponent[]
+
+  @@unique([storeId, productId])
+  @@index([productId])
+  @@index([categoryId])
+  @@map("store_products")
+}
+
+/// Composição de um produto manual "kit" (ex.: uma cesta de presente): quais produtos da MESMA
+/// loja (do catálogo ou manuais) são debitados do estoque junto quando o kit é vendido, e quanto
+/// de cada um. Só um produto manual pode ser kit, e um componente não pode ele mesmo ter
+/// componentes — sem kit-dentro-de-kit, a regra evita ciclos e cálculo recursivo de estoque
+/// (validado no service, não dá pra expressar isso só com o schema).
+model StoreProductComponent {
+  id          String   @id @default(uuid())
+  kitId       String   @map("kit_id")
+  componentId String   @map("component_id")
+  quantity    Int
+  createdAt   DateTime @default(now()) @map("created_at")
+
+  kit       StoreProduct @relation("KitComponents", fields: [kitId], references: [id], onDelete: Cascade)
+  component StoreProduct @relation("ComponentOfKits", fields: [componentId], references: [id], onDelete: Restrict)
+
+  @@unique([kitId, componentId])
+  @@index([componentId])
+  @@map("store_product_components")
+}
+
+enum PaymentMethod {
+  pix
+  card
+  cash
+  on_account
+}
+
+/// `cancelled`: pedido pendente cancelado pela loja (o estoque reservado volta). Só uma venda
+/// `pending` pode ser cancelada; uma venda paga não.
+enum SaleStatus {
+  paid
+  pending
+  cancelled
+}
+
+/// De onde veio a venda: registrada pela própria loja no app (`manual`) ou feita pelo
+/// cliente na vitrine online, o revendaja-web (`online`). Pedido online sempre nasce `pending`.
+enum SaleSource {
+  manual
+  online
+}
+
+/// Como o cliente recebe o pedido feito na vitrine: busca na loja ou a loja entrega.
+enum FulfillmentMethod {
+  pickup
+  delivery
+}
+
+/// Venda da loja. O `total` é gravado na criação, calculado no servidor a partir
+/// do preço vigente dos produtos. `clientRequestId` (gerado pelo app) torna a
+/// criação idempotente: repetir a chamada devolve a mesma venda em vez de duplicar.
+/// `number` é a sequência por loja ("Venda #42").
+model Sale {
+  id               String        @id @default(uuid())
+  storeId          String        @map("store_id")
+  number           Int
+  clientRequestId  String        @map("client_request_id")
+  customerName     String        @map("customer_name")
+  paymentMethod    PaymentMethod @map("payment_method")
+  installments     Int?
+  status           SaleStatus
+  source           SaleSource    @default(manual)
+  // WhatsApp do cliente (só dígitos): o pedido online precisa dele para a loja combinar o pagamento.
+  customerWhatsapp String?       @map("customer_whatsapp")
+  // Só o pedido online preenche: retirada na loja ou entrega. null = venda registrada pela própria loja.
+  fulfillment      FulfillmentMethod?
+  // Endereço de entrega (texto livre do cliente). Só com `fulfillment = delivery`.
+  deliveryAddress  String?       @map("delivery_address")
+  // Entrega paga em dinheiro: "troco para quanto" (nota que o cliente vai entregar). null = não precisa de troco.
+  cashChangeFor    Decimal?      @map("cash_change_for") @db.Decimal(12, 2)
+  total            Decimal       @db.Decimal(12, 2)
+  createdAt        DateTime      @default(now()) @map("created_at")
+
+  store Store      @relation(fields: [storeId], references: [id], onDelete: Cascade)
+  items SaleItem[]
+
+  @@unique([storeId, number])
+  @@unique([storeId, clientRequestId])
+  @@index([storeId, createdAt])
+  @@index([storeId, source])
+  // Cancelamento automático: acha rápido os pedidos online pendentes e antigos, de todas as lojas.
+  @@index([status, source, createdAt])
+  @@map("sales")
+}
+
+/// Item de uma venda. Guarda uma CÓPIA do que valia na hora da venda (nome,
+/// imagem, preço e custo): o histórico não muda se o produto for editado, e
+/// sobrevive à remoção do produto da loja (`storeProductId` vira null).
+model SaleItem {
+  id             String   @id @default(uuid())
+  saleId         String   @map("sale_id")
+  storeProductId String?  @map("store_product_id")
+  productName    String   @map("product_name")
+  productImageSm String?  @map("product_image_sm")
+  quantity       Int
+  unitPrice      Decimal  @map("unit_price") @db.Decimal(10, 2)
+  unitCost       Decimal? @map("unit_cost") @db.Decimal(10, 2)
+
+  sale         Sale                @relation(fields: [saleId], references: [id], onDelete: Cascade)
+  storeProduct StoreProduct?       @relation(fields: [storeProductId], references: [id], onDelete: SetNull)
+  components   SaleItemComponent[]
+
+  @@index([saleId])
+  @@index([storeProductId])
+  @@map("sale_items")
+}
+
+/// Componentes de um kit debitados nesta venda: uma CÓPIA do que valia na hora (mesmo motivo de
+/// `SaleItem` guardar nome/imagem/preço — se a composição do kit mudar depois, cancelar esta venda
+/// tem que devolver exatamente o que foi debitado, não a composição atual). Só existe quando o
+/// item vendido era um kit (produto manual com componentes).
+model SaleItemComponent {
+  id                      String  @id @default(uuid())
+  saleItemId              String  @map("sale_item_id")
+  componentStoreProductId String? @map("component_store_product_id")
+  componentName           String  @map("component_name")
+  quantity                Int
+
+  saleItem              SaleItem      @relation(fields: [saleItemId], references: [id], onDelete: Cascade)
+  componentStoreProduct StoreProduct? @relation(fields: [componentStoreProductId], references: [id], onDelete: SetNull)
+
+  @@index([saleItemId])
+  @@index([componentStoreProductId])
+  @@map("sale_item_components")
+}
+
+/// Visita à vitrine online, registrada pelo revendaja-web. Guardamos só o momento (sem dado do
+/// visitante); a tela Minha Loja conta as dos últimos 7 dias.
+model StoreVisit {
+  id        String   @id @default(uuid())
+  storeId   String   @map("store_id")
+  createdAt DateTime @default(now()) @map("created_at")
+
+  store Store @relation(fields: [storeId], references: [id], onDelete: Cascade)
+
+  @@index([storeId, createdAt])
+  @@map("store_visits")
+}
+
+/// Categoria de conteúdo da notificação (independente de quem recebe — ALL/PLAN/USER é resolvido
+/// no momento do envio, não fica gravado aqui).
+enum NotificationType {
+  SYSTEM
+  STOCK_LOW
+  GOAL
+  PROMOTION
+}
+
+/// Notificação já resolvida por destinatário: mesmo um broadcast ALL/PLAN gera uma linha por
+/// usuário (fan-out feito de forma assíncrona, fora da request HTTP — ver worker da fila
+/// `notifications`). Isso torna a listagem e a segurança triviais: sempre `WHERE userId = ...`,
+/// sem join de escopo nem tabela de leitura separada.
+model Notification {
+  id        String           @id @default(uuid())
+  userId    String           @map("user_id")
+  type      NotificationType
+  title     String
+  message   String
+  // Payload livre para a navegação no app (ex.: { action: "OPEN_STOCK", productId, storeProductId }).
+  data      Json?
+  isRead    Boolean          @default(false) @map("is_read")
+  readAt    DateTime?        @map("read_at")
+  createdAt DateTime         @default(now()) @map("created_at")
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, createdAt])
+  @@index([userId, isRead])
+  @@map("notifications")
+}
+
+enum PushPlatform {
+  ios
+  android
+}
+
+/// Token de push Expo de um dispositivo. `token` é único globalmente (não por usuário): se o
+/// mesmo aparelho logar em outra conta, um upsert por token migra o registro para o novo usuário
+/// em vez de duplicar.
+model PushToken {
+  id        String        @id @default(uuid())
+  userId    String        @map("user_id")
+  token     String        @unique
+  platform  PushPlatform?
+  createdAt DateTime      @default(now()) @map("created_at")
+  updatedAt DateTime      @updatedAt @map("updated_at")
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@map("push_tokens")
+}
+
+/// Controle de anti-duplicação da notificação de progresso de meta mensal: o índice único
+/// impede notificar a mesma loja duas vezes no mesmo mês para o mesmo gatilho (`threshold`), de
+/// forma atômica (tentar inserir e tratar violação, sem SELECT antes). A tabela — em vez de um
+/// campo único na Store — deixa a porta aberta para outros gatilhos futuros (ex.: 50%, 100%).
+model StoreGoalNotification {
+  id         String   @id @default(uuid())
+  storeId    String   @map("store_id")
+  monthKey   String   @map("month_key")
+  threshold  Int
+  notifiedAt DateTime @default(now()) @map("notified_at")
+
+  store Store @relation(fields: [storeId], references: [id], onDelete: Cascade)
+
+  @@unique([storeId, monthKey, threshold])
+  @@map("store_goal_notifications")
+}
+
+/// Eventos de webhook da Stripe já processados. A Stripe pode reenviar o mesmo evento; o id aqui
+/// garante que ele só é aplicado uma vez.
+model StripeWebhookEvent {
+  id          String   @id
+  type        String
+  processedAt DateTime @default(now()) @map("processed_at")
+
+  @@map("stripe_webhook_events")
+}

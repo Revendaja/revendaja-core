@@ -1,0 +1,84 @@
+# ---------- Segredos / variáveis de ambiente ----------
+.env
+.env.*
+!.env.example
+**/.env
+**/.env.*
+!**/.env.example
+
+# ---------- Chaves, certificados e keystores ----------
+*.jks
+*.keystore
+*.p8
+*.p12
+*.pfx
+*.pem
+*.key
+*.mobileprovision
+*.cer
+*.crt
+
+# ---------- Credenciais de serviços ----------
+*firebase-adminsdk*.json
+serviceAccount*.json
+service-account*.json
+credentials.json
+secrets.json
+*.tfvars
+*.tfstate
+*.tfstate.*
+# Stripe CLI / outras ferramentas
+.stripe/
+
+# ---------- Bancos locais ----------
+*.sqlite
+*.sqlite3
+*.db
+
+# ---------- Dependências ----------
+node_modules/
+.pnp
+.pnp.*
+.yarn/*
+!.yarn/patches
+!.yarn/plugins
+!.yarn/releases
+!.yarn/versions
+
+# ---------- Build / output ----------
+dist/
+build/
+out/
+web-build/
+.next/
+.vercel
+coverage/
+*.tsbuildinfo
+next-env.d.ts
+expo-env.d.ts
+
+# ---------- Expo / mobile nativo ----------
+.expo/
+.kotlin/
+revendaja-mobile-1.0/ios/
+revendaja-mobile-1.0/android/
+.metro-health-check*
+
+# ---------- Logs ----------
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+.pnpm-debug.log*
+
+# ---------- Editor / OS ----------
+.DS_Store
+Thumbs.db
+desktop.ini
+.vscode/*
+!.vscode/extensions.json
+!.vscode/settings.json
+.idea/
+
+# ---------- Claude Code (config local) ----------
+.claude/settings.local.json
