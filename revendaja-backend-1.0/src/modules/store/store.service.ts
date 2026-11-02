@@ -108,6 +108,10 @@ export class StoreService {
       const bio = input.bio === null || input.bio === '' ? null : input.bio;
       if (bio !== store.bio) changes.bio = bio;
     }
+    if (input.logo !== undefined && input.logo !== store.logo) {
+      // Nulo remove a logo (a vitrine volta a mostrar a inicial do nome).
+      changes.logo = input.logo;
+    }
     if (input.handle !== undefined && input.handle !== store.handle) {
       if (RESERVED_HANDLES.has(input.handle)) throw handleUnavailable();
       const owner = await this.repository.findByHandle(input.handle);

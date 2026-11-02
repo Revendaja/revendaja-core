@@ -3,7 +3,8 @@ import { Animated, Image, View, Text, FlatList, Pressable, Alert } from 'react-n
 import type { ImageSourcePropType } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
-import { Swipeable } from 'react-native-gesture-handler';
+import ReanimatedSwipeable from 'react-native-gesture-handler/ReanimatedSwipeable';
+import Reanimated, { Extrapolation, interpolate, useAnimatedStyle, type SharedValue } from 'react-native-reanimated';
 import { useMutation, useQueryClient, type InfiniteData } from '@tanstack/react-query';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { ErrorState, ListFooter } from '../../components/ListStates';
@@ -47,6 +48,34 @@ const SWIPE_TRIGGER_THRESHOLD = 100;
 // Linha isolada num componente próprio (não inline no `renderItem`): precisa de estado/Animated
 // PRÓPRIO por notificação (a altura medida, a animação de encolher), o que só funciona certo
 // como uma instância de componente de verdade, não como uma função anônima recriada a cada render.
+function DeleteAction({
+  translation,
+  title,
+  onPress,
+}: {
+  translation: SharedValue<number>;
+  title: string;
+  onPress: () => void;
+}) {
+  const style = useAnimatedStyle(() => ({
+    transform: [
+      { translateX: interpolate(translation.value, [-SWIPE_ACTION_WIDTH, 0], [0, SWIPE_ACTION_WIDTH], Extrapolation.CLAMP) },
+    ],
+  }));
+  return (
+    <Reanimated.View style={[{ width: SWIPE_ACTION_WIDTH }, style]}>
+      <Pressable
+        onPress={onPress}
+        accessibilityRole="button"
+        accessibilityLabel={`Excluir notificação: ${title}`}
+        className="flex-1 bg-danger justify-center items-center"
+      >
+        <Ionicons name="trash-outline" size={22} color="#fff" />
+      </Pressable>
+    </Reanimated.View>
+  );
+}
+
 function NotificationRow({
   item,
   onPress,
@@ -86,7 +115,7 @@ function NotificationRow({
         if (measuredHeight === null) setMeasuredHeight(event.nativeEvent.layout.height);
       }}
     >
-      <Swipeable
+      <ReanimatedSwipeable
         overshootRight={false}
         rightThreshold={SWIPE_TRIGGER_THRESHOLD}
         friction={1.8}
@@ -95,27 +124,11 @@ function NotificationRow({
         onSwipeableWillOpen={(direction) => {
           if (direction === 'right') collapseAndDelete();
         }}
-        renderRightActions={(_progress, dragX) => {
+        renderRightActions={(_progress, translation) => (
           // Contrabalança o arrasto: o painel (largura fixa) fica "colado" revelando aos poucos, em
           // vez do ícone escorregar junto com o dedo — ele fica parado no lugar.
-          const translateX = dragX.interpolate({
-            inputRange: [-SWIPE_ACTION_WIDTH, 0],
-            outputRange: [0, SWIPE_ACTION_WIDTH],
-            extrapolate: 'clamp',
-          });
-          return (
-            <Animated.View style={{ width: SWIPE_ACTION_WIDTH, transform: [{ translateX }] }}>
-              <Pressable
-                onPress={collapseAndDelete}
-                accessibilityRole="button"
-                accessibilityLabel={`Excluir notificação: ${item.title}`}
-                className="flex-1 bg-danger justify-center items-center"
-              >
-                <Ionicons name="trash-outline" size={22} color="#fff" />
-              </Pressable>
-            </Animated.View>
-          );
-        }}
+          <DeleteAction translation={translation} title={item.title} onPress={collapseAndDelete} />
+        )}
       >
         <Pressable
           onPress={() => onPress(item)}
@@ -141,7 +154,7 @@ function NotificationRow({
           </View>
           <Text className="text-[11px] text-ink-400">{formatRelativeTime(item.createdAt)}</Text>
         </Pressable>
-      </Swipeable>
+      </ReanimatedSwipeable>
     </Animated.View>
   );
 }

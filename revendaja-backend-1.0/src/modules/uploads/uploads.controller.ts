@@ -68,6 +68,11 @@ export function uploadProductImage(request: FastifyRequest, reply: FastifyReply)
   return handleImageUpload(request, reply, 'products');
 }
 
+// Logo da loja (topo da vitrine): mesma validação, outra pasta no bucket.
+export function uploadStoreLogo(request: FastifyRequest, reply: FastifyReply) {
+  return handleImageUpload(request, reply, 'logos');
+}
+
 // Banners da vitrine (topo, ofertas e coleções): mesma validação, outra pasta no bucket.
 export function uploadStoreBanner(request: FastifyRequest, reply: FastifyReply) {
   return handleImageUpload(request, reply, 'banners');

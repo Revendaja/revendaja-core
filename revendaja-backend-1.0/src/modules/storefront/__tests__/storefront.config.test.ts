@@ -1,4 +1,6 @@
 import {
+  DEFAULT_BANNER_IMAGES,
+  MAX_BANNERS,
   applyConfigUpdate,
   buildDefaultConfig,
   customizedSections,
@@ -107,6 +109,7 @@ describe('customizedSections', () => {
   it('marca só as seções com override', () => {
     expect(customizedSections({ hero: HERO })).toEqual({
       announcement: false,
+      banners: false,
       hero: true,
       benefits: false,
       flash: false,
@@ -196,5 +199,41 @@ describe('updateStorefrontConfigSchema', () => {
     expect(hero('javascript:alert(1)')).toBe(false);
     expect(hero('http://exemplo.com/banner.jpg')).toBe(false);
     expect(hero('banner.jpg')).toBe(false);
+  });
+});
+
+describe('banners do topo', () => {
+  const bucket = process.env.S3_PUBLIC_BASE_URL;
+  const banners = (...urls: string[]) =>
+    updateStorefrontConfigSchema.safeParse({
+      banners: urls.map((imageUrl) => ({ imageUrl, link: null })),
+    }).success;
+
+  it('o padrão tem 3 banners de exemplo, cada um com um destino', () => {
+    const config = buildDefaultConfig('Leal');
+
+    expect(config.banners.map((banner) => banner.imageUrl)).toEqual([...DEFAULT_BANNER_IMAGES]);
+    expect(config.banners.every((banner) => banner.link !== null)).toBe(true);
+  });
+
+  it('aceita upload da loja e os banners de exemplo, mas não imagem de terceiros', () => {
+    expect(banners(`${bucket}/users/u1/banners/a.jpg`, DEFAULT_BANNER_IMAGES[0])).toBe(true);
+    expect(banners('https://cdn.exemplo.com/banner.jpg')).toBe(false);
+    expect(banners('https://images.unsplash.com/photo-outra-imagem')).toBe(false);
+  });
+
+  it(`exige de 1 a ${MAX_BANNERS} banners`, () => {
+    const image = `${bucket}/users/u1/banners/a.jpg`;
+
+    expect(banners()).toBe(false);
+    expect(banners(...Array(MAX_BANNERS).fill(image))).toBe(true);
+    expect(banners(...Array(MAX_BANNERS + 1).fill(image))).toBe(false);
+  });
+
+  it('null restaura o padrão', () => {
+    const custom = { banners: [{ imageUrl: `${bucket}/users/u1/banners/a.jpg`, link: null }] };
+
+    expect(applyConfigUpdate(custom, { banners: null })).toEqual({});
+    expect(customizedSections(custom).banners).toBe(true);
   });
 });

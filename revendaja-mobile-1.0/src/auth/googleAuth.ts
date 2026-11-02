@@ -1,4 +1,16 @@
-import { GoogleSignin } from '@react-native-google-signin/google-signin';
+import type { GoogleSignin as GoogleSigninType } from '@react-native-google-signin/google-signin';
+
+// Carregado sob demanda: o módulo nativo não existe no Expo Go e um import estático derrubaria o
+// app inteiro na inicialização (TurboModuleRegistry 'RNGoogleSignin' could not be found).
+function loadGoogleSignin(): typeof GoogleSigninType {
+  try {
+    return require('@react-native-google-signin/google-signin').GoogleSignin;
+  } catch {
+    throw new Error(
+      'Login com Google não está disponível no Expo Go. Use e-mail e senha ou um development build.',
+    );
+  }
+}
 
 // Mesmo Client ID tipo "Web application" que o backend usa como GOOGLE_CLIENT_ID (audience do
 // idToken). É assim que o SDK nativo (Android/iOS) consegue emitir um idToken que o backend sabe
@@ -7,7 +19,7 @@ const GOOGLE_WEB_CLIENT_ID = process.env.EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID;
 
 let configured = false;
 
-function ensureConfigured() {
+function ensureConfigured(GoogleSignin: typeof GoogleSigninType) {
   if (configured) return;
   if (!GOOGLE_WEB_CLIENT_ID) {
     throw new Error(
@@ -20,7 +32,8 @@ function ensureConfigured() {
 
 // null = a usuária cancelou o seletor de contas — não é erro, não deve mostrar aviso nenhum.
 export async function signInWithGoogle(): Promise<string | null> {
-  ensureConfigured();
+  const GoogleSignin = loadGoogleSignin();
+  ensureConfigured(GoogleSignin);
   await GoogleSignin.hasPlayServices();
   const response = await GoogleSignin.signIn();
   if (response.type === 'cancelled') return null;

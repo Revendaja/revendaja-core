@@ -10,6 +10,8 @@ export interface Store {
   isOnline: boolean;
   // Descrição curta da loja (topo da vitrine). null = a loja não escreveu uma.
   bio: string | null;
+  // Logo da loja (URL do nosso bucket). null = a vitrine usa a inicial do nome.
+  logo: string | null;
   // Plano da loja: define os limites de produtos e quais recursos estão liberados
   // (ver `STORE_PLAN_LIMITS` em `store.plans.ts`).
   plan: StorePlan;
@@ -28,6 +30,7 @@ export interface StoreChanges {
   // Sempre muda junto com o handle: o link é https://{handle}.{domínio}.
   catalogLink?: string;
   bio?: string | null;
+  logo?: string | null;
   defaultMinStock?: number;
 }
 

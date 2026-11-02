@@ -4,7 +4,7 @@ import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useAuth } from '@/lib/auth/AuthContext';
-import { getStoreSettings, updateStore, updateStoreSettings, type StoreChanges } from '@/lib/api/stores';
+import { getStoreSettings, updateStore, updateStoreSettings, uploadStoreLogo, type StoreChanges } from '@/lib/api/stores';
 import { queryKeys } from '@/lib/api/queryKeys';
 import { getErrorMessage, isApiError } from '@/lib/api/errors';
 import type { NewSalePaymentMethod, StoreInfo, StoreSettings } from '@/lib/api/types';
@@ -14,6 +14,7 @@ import { Icon } from '@/components/dashboard/icons';
 import { Banner, Field, PageHeader, TextInput, Toggle } from '@/components/products/FormParts';
 import { Card, CardHeader } from '@/components/dashboard/overview/ui';
 import { storeUrl } from '@/lib/storefront/domain';
+import { ImageField } from '@/components/storefront/editor/fields';
 
 // Mesmas regras da API: não há campo de link separado — o handle é sempre o nome da loja
 // "traduzido" (sem espaço, acento ou maiúscula), igual à criação da loja.
@@ -49,6 +50,7 @@ function EditStoreForm({ store }: { store: StoreInfo }) {
 
   const [storeName, setStoreName] = useState(store.storeName);
   const [bio, setBio] = useState(store.bio ?? '');
+  const [logo, setLogo] = useState(store.logo);
   const [defaultMinStock, setDefaultMinStock] = useState(String(store.defaultMinStock));
   const [nameError, setNameError] = useState<string | null>(null);
   const [minStockError, setMinStockError] = useState<string | null>(null);
@@ -77,6 +79,7 @@ function EditStoreForm({ store }: { store: StoreInfo }) {
     if (handle !== slugifyName(store.storeName)) changes.handle = handle;
     // Descrição vazia limpa a que existia.
     if (bio.trim() !== (store.bio ?? '')) changes.bio = bio.trim();
+    if (logo !== store.logo) changes.logo = logo;
     if (minStockValue !== store.defaultMinStock) changes.defaultMinStock = minStockValue;
     return changes;
   }
@@ -145,6 +148,17 @@ function EditStoreForm({ store }: { store: StoreInfo }) {
                   aria-label="Nome da loja"
                 />
               </Field>
+
+              <ImageField
+                label="Logo da loja"
+                hint="Opcional. JPEG, PNG ou WEBP de até 5 MB (sugestão: quadrada, 512 × 512). Aparece no topo da vitrine."
+                value={logo}
+                onChange={setLogo}
+                upload={uploadStoreLogo}
+                emptyLabel="Sem logo"
+                removeLabel="Remover logo"
+                disabled={loading}
+              />
 
               <Field label="Link da vitrine" hint="O link é sempre o nome da sua loja — muda junto com ele.">
                 <div className="flex h-11 items-center gap-2 rounded-xl border border-ink-200 bg-ink-50 px-3 text-sm text-ink-700">

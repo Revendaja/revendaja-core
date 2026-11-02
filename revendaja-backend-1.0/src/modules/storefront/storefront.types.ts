@@ -28,6 +28,8 @@ export interface Storefront {
     handle: string;
     // Descrição da loja (topo da vitrine). null = não escreveu.
     bio: string | null;
+    // Logo da loja (URL). null = a vitrine usa a inicial do nome.
+    logo: string | null;
     acceptedPaymentMethods: AcceptedPaymentMethod[];
   };
   products: Paginated<StorefrontProduct>;
@@ -78,6 +80,8 @@ export interface StorefrontHome {
     storeName: string;
     handle: string;
     bio: string | null;
+    // Logo da loja (URL). null = a vitrine usa a inicial do nome.
+    logo: string | null;
     acceptedPaymentMethods: AcceptedPaymentMethod[];
     // Planos Pro e Empresarial tiram a marca do Revendajá do rodapé.
     hideBranding: boolean;

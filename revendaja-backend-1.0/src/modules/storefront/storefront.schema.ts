@@ -106,6 +106,7 @@ export const storefrontResponseSchema = z.object({
     storeName: z.string(),
     handle: z.string(),
     bio: z.string().nullable(),
+    logo: z.string().nullable(),
     acceptedPaymentMethods: z.array(createPaymentMethodSchema),
   }),
   products: z.object({
@@ -121,6 +122,7 @@ export const storefrontHomeResponseSchema = z.object({
     storeName: z.string(),
     handle: z.string(),
     bio: z.string().nullable(),
+    logo: z.string().nullable(),
     acceptedPaymentMethods: z.array(createPaymentMethodSchema),
     hideBranding: z.boolean(),
   }),
@@ -147,6 +149,7 @@ export const storefrontCustomizationResponseSchema = z.object({
   defaults: storefrontConfigSchema,
   customized: z.object({
     announcement: z.boolean(),
+    banners: z.boolean(),
     hero: z.boolean(),
     benefits: z.boolean(),
     flash: z.boolean(),

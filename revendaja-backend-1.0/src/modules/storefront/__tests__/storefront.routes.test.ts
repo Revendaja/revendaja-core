@@ -61,6 +61,7 @@ function storeRow(overrides: Record<string, unknown> = {}) {
     catalogLink: 'https://lealperfumaria.revendaja.com',
     isOnline: true,
     bio: 'Cosméticos com entrega rápida.',
+    logo: null,
     createdAt: new Date(),
     ...overrides,
   };
@@ -230,6 +231,7 @@ describe('GET /public/stores/:handle (vitrine pública, sem login)', () => {
         storeName: 'Leal Perfumaria',
         handle: 'lealperfumaria',
         bio: 'Cosméticos com entrega rápida.',
+        logo: null,
         acceptedPaymentMethods: ['pix', 'card', 'cash'],
       },
       products: {

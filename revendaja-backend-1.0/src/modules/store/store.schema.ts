@@ -2,6 +2,7 @@ import { z } from 'zod';
 import { env } from '../../config/env';
 import { catalogProductResponseSchema } from '../catalog/catalog.schema';
 import { createPaymentMethodSchema } from '../sales/sales.schema';
+import { imageUrl } from '../storefront/storefront.config';
 
 export const createStoreSchema = z.object({
   storeName: z.string().min(2).max(120),
@@ -34,6 +35,7 @@ export const storeResponseSchema = z.object({
   catalogLink: z.string().url(),
   isOnline: z.boolean(),
   bio: z.string().nullable(),
+  logo: z.string().nullable(),
   defaultMinStock: z.number().int(),
   createdAt: z.date(),
 });
@@ -47,6 +49,8 @@ export const updateStoreSchema = z
     storeName: z.string().trim().min(2).max(120).optional(),
     handle: storeHandleSchema.optional(),
     bio: z.string().trim().max(280).nullable().optional(),
+    // URL devolvida por POST /uploads/store-logo. null remove a logo.
+    logo: imageUrl.nullable().optional(),
     // Valor inicial pra produto NOVO (ver StoreService#addProduct/addManualProduct) e também
     // aplicado a quem já está na loja e ainda segue o padrão ANTIGO — não toca em quem já tem um
     // `minStock` próprio, diferente do padrão anterior (ver StoreService#updateStore). 0 = desligar.
@@ -58,8 +62,9 @@ export const updateStoreSchema = z
       data.storeName !== undefined ||
       data.handle !== undefined ||
       data.bio !== undefined ||
+      data.logo !== undefined ||
       data.defaultMinStock !== undefined,
-    { message: 'Informe isOnline, storeName, handle, bio e/ou defaultMinStock.' },
+    { message: 'Informe isOnline, storeName, handle, bio, logo e/ou defaultMinStock.' },
   );
 
 export type CreateStoreInput = z.infer<typeof createStoreSchema>;

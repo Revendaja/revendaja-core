@@ -51,7 +51,7 @@ export default function SalesScreen({ navigation }: Props) {
   const [today, setToday] = useState(() => new Date());
   const [selectedMonth, setSelectedMonth] = useState(() => new Date().getMonth());
 
-  const monthScrollRef = useRef<ScrollView>(null);
+  const monthScrollRef = useRef<React.ComponentRef<typeof ScrollView>>(null);
   const monthLayouts = useRef<Record<number, { x: number; width: number }>>({});
   const monthScrollWidth = useRef(0);
   const didAutoScrollMonth = useRef(false);

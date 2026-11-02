@@ -51,6 +51,7 @@ function storeRow(overrides: Record<string, unknown> = {}) {
     catalogLink: 'https://lealperfumaria.revendaja.com',
     isOnline: true,
     bio: null,
+    logo: null,
     plan: 'free',
     storefrontConfig: null,
     createdAt: new Date(),
@@ -165,6 +166,7 @@ describe('GET /public/stores/:handle/home (página inicial da vitrine, sem login
       storeName: 'Leal Perfumaria',
       handle: 'lealperfumaria',
       bio: null,
+      logo: null,
       acceptedPaymentMethods: ['pix', 'card', 'cash'],
       hideBranding: false,
     });
@@ -445,6 +447,7 @@ describe('Aparência da vitrine (painel, autenticada)', () => {
     expect(body.config).toEqual(body.defaults);
     expect(body.customized).toEqual({
       announcement: false,
+      banners: false,
       hero: false,
       benefits: false,
       flash: false,

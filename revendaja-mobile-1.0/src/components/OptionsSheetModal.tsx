@@ -49,7 +49,7 @@ export default function OptionsSheetModal({
           contentContainerStyle={{ padding: 20, paddingTop: 8, flexGrow: 1 }}
           keyboardShouldPersistTaps="handled"
           ListEmptyComponent={<Text className="text-center text-sm text-ink-400 mt-10">{emptyLabel}</Text>}
-          ListFooterComponent={footer ? <View className="mt-2">{footer}</View> : null}
+          ListFooterComponent={footer ? <View className="mt-2">{footer}</View> : undefined}
           renderItem={({ item }) => {
             const active = item.key === selectedKey;
             return (

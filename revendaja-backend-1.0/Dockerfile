@@ -6,7 +6,9 @@ COPY package*.json ./
 RUN npm ci
 
 COPY . .
-RUN npx prisma generate
+# O prisma.config.ts exige DATABASE_URL mesmo no generate, que não conecta ao banco.
+# Valor fictício só neste comando: as variáveis de ambiente reais do deploy não existem no build.
+RUN DATABASE_URL="postgresql://build:build@localhost:5432/build" npx prisma generate
 RUN npm run build
 
 # ---- Production stage ----

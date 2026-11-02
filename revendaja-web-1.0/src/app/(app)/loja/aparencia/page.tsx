@@ -1,26 +1,23 @@
 'use client';
 
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useAuth } from '@/lib/auth/AuthContext';
-import { getStorefrontCustomization, updateStorefrontCustomization, type StorefrontConfigChanges } from '@/lib/api/storefrontConfig';
+import { getStorefrontCustomization, updateStorefrontCustomization, uploadBannerImage, type StorefrontConfigChanges } from '@/lib/api/storefrontConfig';
 import { listStoreCategories } from '@/lib/api/storeCategories';
 import { getErrorMessage } from '@/lib/api/errors';
 import { queryKeys } from '@/lib/api/queryKeys';
-import { BENEFIT_ICONS, type BenefitIcon, type CollectionLink, type StorefrontConfig, type StorefrontCustomization, type StorefrontSection } from '@/lib/api/types';
+import { BENEFIT_ICONS, MAX_BANNERS, type BenefitIcon, type CollectionLink, type StorefrontBanner, type StorefrontConfig, type StorefrontCustomization, type StorefrontSection } from '@/lib/api/types';
 import { storeUrl } from '@/lib/storefront/domain';
 import { Field, PageHeader, TextInput, ToggleRow } from '@/components/products/FormParts';
 import { Icon } from '@/components/dashboard/icons';
-import { ImageField, SelectInput } from '@/components/storefront/editor/fields';
+import { ImageField, MAX_IMAGE_MB, SelectInput } from '@/components/storefront/editor/fields';
 import { SectionEditor, filled } from '@/components/storefront/editor/SectionEditor';
 
 // Limites iguais aos da API (storefront.config.ts).
 const LIMITS = {
   announcementText: 120,
   announcementRight: 80,
-  badge: 40,
-  title: 60,
-  subtitle: 160,
   button: 24,
   benefitTitle: 30,
   benefitText: 60,
@@ -38,6 +35,9 @@ const ICON_LABELS: Record<BenefitIcon, string> = {
   gift: 'Presente',
   star: 'Estrela',
 };
+
+// Valor do <select> para "banner sem link".
+const NO_LINK = 'none';
 
 const SECTION_LINKS: { value: string; label: string }[] = [
   { value: 'section:featured', label: 'Produtos em destaque' },
@@ -66,6 +66,7 @@ export default function StorefrontAppearancePage() {
   // Cada "Restaurar padrão" remonta o formulário da seção, para o rascunho voltar ao padrão.
   const [versions, setVersions] = useState<Record<StorefrontSection, number>>({
     announcement: 0,
+    banners: 0,
     hero: 0,
     benefits: 0,
     flash: 0,
@@ -139,12 +140,13 @@ export default function StorefrontAppearancePage() {
             onSave={(value) => save('announcement', value)}
             onReset={() => reset('announcement')}
           />
-          <HeroForm
-            key={`hero-${versions.hero}`}
-            saved={data.config.hero}
-            customized={data.customized.hero}
-            onSave={(value) => save('hero', value)}
-            onReset={() => reset('hero')}
+          <BannersForm
+            key={`banners-${versions.banners}`}
+            saved={data.config.banners}
+            customized={data.customized.banners}
+            categories={categoriesQuery.data?.items ?? []}
+            onSave={(value) => save('banners', value)}
+            onReset={() => reset('banners')}
           />
           <BenefitsForm
             key={`benefits-${versions.benefits}`}
@@ -218,52 +220,143 @@ function AnnouncementForm({ saved, customized, onSave, onReset }: FormProps<'ann
   );
 }
 
-function HeroForm({ saved, customized, onSave, onReset }: FormProps<'hero'>) {
+function BannersForm({
+  saved,
+  customized,
+  categories,
+  onSave,
+  onReset,
+}: FormProps<'banners'> & { categories: { id: string; name: string }[] }) {
   const [draft, setDraft] = useState(saved);
-  const set = (patch: Partial<StorefrontConfig['hero']>) => setDraft({ ...draft, ...patch });
-  const valid =
-    filled(draft.badge) && filled(draft.title) && filled(draft.highlight) && filled(draft.subtitle) && filled(draft.primaryLabel) && filled(draft.secondaryLabel);
+  const [adding, setAdding] = useState(false);
+  const [addError, setAddError] = useState<string | null>(null);
+  const addInputRef = useRef<HTMLInputElement>(null);
+
+  const setItem = (index: number, patch: Partial<StorefrontBanner>) =>
+    setDraft(draft.map((item, itemIndex) => (itemIndex === index ? { ...item, ...patch } : item)));
+
+  function move(index: number, delta: -1 | 1) {
+    const target = index + delta;
+    if (target < 0 || target >= draft.length) return;
+    const next = [...draft];
+    [next[index], next[target]] = [next[target], next[index]];
+    setDraft(next);
+  }
+
+  async function addBanner(event: React.ChangeEvent<HTMLInputElement>) {
+    const file = event.target.files?.[0];
+    // Permite escolher o mesmo arquivo de novo depois.
+    event.target.value = '';
+    if (!file) return;
+    setAddError(null);
+    if (file.size > MAX_IMAGE_MB * 1024 * 1024) {
+      setAddError(`Imagem muito grande (máx. ${MAX_IMAGE_MB} MB).`);
+      return;
+    }
+    setAdding(true);
+    try {
+      const { url } = await uploadBannerImage(file);
+      setDraft((current) => [...current, { imageUrl: url, link: null }]);
+    } catch (error) {
+      setAddError(getErrorMessage(error));
+    } finally {
+      setAdding(false);
+    }
+  }
 
   return (
     <SectionEditor
-      title="Banner principal"
-      description="O destaque grande no topo da página."
+      title="Banners do topo"
+      description="As imagens que passam no topo da vitrine, de um lado para o outro. Até 5."
       customized={customized}
       draft={draft}
       saved={saved}
-      isValid={valid}
+      isValid={draft.length >= 1 && draft.length <= MAX_BANNERS}
       onSave={onSave}
       onReset={onReset}
     >
-      <div className="grid gap-4 sm:grid-cols-2">
-        <Field label="Selo (texto pequeno)">
-          <TextInput value={draft.badge} onChange={(badge) => set({ badge })} maxLength={LIMITS.badge} aria-label="Selo do banner" />
-        </Field>
-        <div />
-        <Field label="Título">
-          <TextInput value={draft.title} onChange={(title) => set({ title })} maxLength={LIMITS.title} aria-label="Título do banner" />
-        </Field>
-        <Field label="Destaque (em laranja)">
-          <TextInput value={draft.highlight} onChange={(highlight) => set({ highlight })} maxLength={LIMITS.title} aria-label="Destaque do banner" />
-        </Field>
+      {draft.map((item, index) => {
+        const value = item.link ? linkToValue(item.link) : NO_LINK;
+        const known =
+          value === NO_LINK ||
+          SECTION_LINKS.some((option) => option.value === value) ||
+          categories.some((category) => `category:${category.id}` === value);
+        const options = [
+          { value: NO_LINK, label: 'Nenhum (só a imagem)' },
+          ...SECTION_LINKS,
+          ...categories.map((category) => ({ value: `category:${category.id}`, label: `Categoria: ${category.name}` })),
+          // Link configurado por outro caminho (marca ou categoria que não existe mais): mantém visível.
+          ...(known ? [] : [{ value, label: 'Link atual' }]),
+        ];
+        return (
+          <div key={index} className="flex flex-col gap-3 rounded-xl border border-ink-100 p-3">
+            <div className="flex items-center justify-between gap-2">
+              <p className="text-xs font-semibold text-ink-500">Banner {index + 1}</p>
+              <div className="flex items-center gap-1">
+                <button
+                  type="button"
+                  onClick={() => move(index, -1)}
+                  disabled={index === 0}
+                  aria-label={`Subir o banner ${index + 1}`}
+                  className="h-8 rounded-lg border border-ink-200 px-2.5 text-xs font-semibold text-ink-700 transition hover:bg-ink-50 disabled:opacity-40"
+                >
+                  ↑
+                </button>
+                <button
+                  type="button"
+                  onClick={() => move(index, 1)}
+                  disabled={index === draft.length - 1}
+                  aria-label={`Descer o banner ${index + 1}`}
+                  className="h-8 rounded-lg border border-ink-200 px-2.5 text-xs font-semibold text-ink-700 transition hover:bg-ink-50 disabled:opacity-40"
+                >
+                  ↓
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setDraft(draft.filter((_, itemIndex) => itemIndex !== index))}
+                  disabled={draft.length <= 1}
+                  aria-label={`Remover o banner ${index + 1}`}
+                  className="h-8 rounded-lg px-2.5 text-xs font-semibold text-danger transition hover:bg-danger-soft disabled:opacity-40"
+                >
+                  Remover
+                </button>
+              </div>
+            </div>
+            <ImageField
+              label={`Imagem do banner ${index + 1}`}
+              hint="JPEG, PNG ou WEBP de até 5 MB. Tamanho ideal: 1920 × 600 (formato bem largo)."
+              value={item.imageUrl}
+              onChange={(imageUrl) => imageUrl && setItem(index, { imageUrl })}
+              removable={false}
+            />
+            <Field label="Ao clicar, leva para" hint={index === 0 && categories.length === 0 ? 'Crie categorias em "Meus produtos" para poder apontar para elas.' : undefined}>
+              <SelectInput
+                label={`Destino do banner ${index + 1}`}
+                value={value}
+                onChange={(next) => setItem(index, { link: next === NO_LINK ? null : valueToLink(next) })}
+                options={options}
+              />
+            </Field>
+          </div>
+        );
+      })}
+
+      <div>
+        <input ref={addInputRef} type="file" accept="image/jpeg,image/png,image/webp" onChange={addBanner} className="sr-only" aria-label="Adicionar banner" />
+        <button
+          type="button"
+          onClick={() => addInputRef.current?.click()}
+          disabled={adding || draft.length >= MAX_BANNERS}
+          className="h-10 rounded-xl border border-dashed border-ink-300 px-4 text-sm font-semibold text-ink-700 transition hover:bg-ink-50 disabled:opacity-50"
+        >
+          {adding ? 'Enviando...' : draft.length >= MAX_BANNERS ? `Limite de ${MAX_BANNERS} banners` : '+ Adicionar banner'}
+        </button>
+        {addError && (
+          <p className="mt-1.5 text-xs text-danger" role="alert">
+            {addError}
+          </p>
+        )}
       </div>
-      <Field label="Descrição" hint={`Até ${LIMITS.subtitle} caracteres.`}>
-        <TextInput value={draft.subtitle} onChange={(subtitle) => set({ subtitle })} maxLength={LIMITS.subtitle} aria-label="Descrição do banner" />
-      </Field>
-      <div className="grid gap-4 sm:grid-cols-2">
-        <Field label="Botão principal">
-          <TextInput value={draft.primaryLabel} onChange={(primaryLabel) => set({ primaryLabel })} maxLength={LIMITS.button} aria-label="Botão principal" />
-        </Field>
-        <Field label="Botão de ofertas" hint="Aparece só quando há produtos em promoção.">
-          <TextInput value={draft.secondaryLabel} onChange={(secondaryLabel) => set({ secondaryLabel })} maxLength={LIMITS.button} aria-label="Botão de ofertas" />
-        </Field>
-      </div>
-      <ImageField
-        label="Imagem do banner"
-        hint="Opcional. JPEG, PNG ou WEBP de até 5 MB (sugestão: 1200 × 800). Sem imagem, a vitrine monta a arte com as fotos dos seus produtos."
-        value={draft.imageUrl}
-        onChange={(imageUrl) => set({ imageUrl })}
-      />
     </SectionEditor>
   );
 }

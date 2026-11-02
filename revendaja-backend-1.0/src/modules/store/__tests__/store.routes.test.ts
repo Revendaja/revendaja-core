@@ -167,6 +167,7 @@ describe('POST /store', () => {
         id: '11111111-1111-4111-8111-111111111111',
         isOnline: true,
         bio: null,
+        logo: null,
         defaultMinStock: 0,
         createdAt: new Date(),
         ...data,
@@ -203,6 +204,7 @@ const OWN_STORE = {
   catalogLink: 'https://lealperfumaria.revendaja.com',
   isOnline: true,
   bio: null,
+  logo: null,
   plan: 'premium',
   defaultMinStock: 0,
   createdAt: new Date(),
@@ -363,6 +365,7 @@ describe('PATCH /store (Editar Loja: nome, link e descrição)', () => {
       storeName: 'Nova Perfumaria',
       handle: 'lealperfumaria',
       bio: 'Descrição antiga',
+      logo: null,
     });
     expect(storeUpdate).toHaveBeenCalledWith({
       where: { id: STORE_ID },
@@ -1268,12 +1271,17 @@ describe('GET/POST/DELETE /store/products/categories', () => {
 
     expect(response.statusCode).toBe(201);
     expect(response.json()).toEqual({ id: CATEGORY_A, name: 'Perfumaria', productCount: 0 });
-    expect(storeCategoryCreate.mock.calls[0][0].data).toEqual({ storeId: 'store-1', name: 'Perfumaria' });
+    expect(storeCategoryCreate.mock.calls[0][0].data).toEqual({
+      storeId: 'store-1',
+      name: 'Perfumaria',
+    });
   });
 
   it('POST com nome repetido: 409 (índice único storeId+name)', async () => {
     arrange();
-    storeCategoryCreate.mockRejectedValue(Object.assign(new Error('Unique constraint'), { code: 'P2002' }));
+    storeCategoryCreate.mockRejectedValue(
+      Object.assign(new Error('Unique constraint'), { code: 'P2002' }),
+    );
 
     const app = await buildApp();
     const response = await app.inject({
@@ -1318,7 +1326,10 @@ describe('GET/POST/DELETE /store/products/categories', () => {
     await app.close();
 
     expect(response.statusCode).toBe(204);
-    expect(storeCategoryFindFirst.mock.calls[0][0].where).toEqual({ id: CATEGORY_ID, storeId: 'store-1' });
+    expect(storeCategoryFindFirst.mock.calls[0][0].where).toEqual({
+      id: CATEGORY_ID,
+      storeId: 'store-1',
+    });
   });
 
   it('DELETE de categoria de outra loja (ou inexistente): 404', async () => {
@@ -1664,7 +1675,10 @@ describe('PATCH /store/products/:id', () => {
       const response = await patchPromo({ promoPrice: null, promoEndsAt: null });
 
       expect(response.statusCode).toBe(200);
-      expect(storeProductUpdate.mock.calls[0][0].data).toEqual({ promoPrice: null, promoEndsAt: null });
+      expect(storeProductUpdate.mock.calls[0][0].data).toEqual({
+        promoPrice: null,
+        promoEndsAt: null,
+      });
     });
 
     it('400 quando promoPrice não é menor que o preço normal', async () => {
@@ -1730,7 +1744,10 @@ describe('PATCH /store/products/:id', () => {
       const response = await patchCategory({ categoryId: CATEGORY_ID });
 
       expect(response.statusCode).toBe(200);
-      expect(storeCategoryFindFirst.mock.calls[0][0].where).toEqual({ id: CATEGORY_ID, storeId: 'store-1' });
+      expect(storeCategoryFindFirst.mock.calls[0][0].where).toEqual({
+        id: CATEGORY_ID,
+        storeId: 'store-1',
+      });
       expect(storeProductUpdate.mock.calls[0][0].data.categoryId).toBe(CATEGORY_ID);
     });
 

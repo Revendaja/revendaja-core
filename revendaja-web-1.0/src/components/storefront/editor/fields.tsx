@@ -48,12 +48,22 @@ export function ImageField({
   value,
   onChange,
   disabled,
+  upload = uploadBannerImage,
+  emptyLabel = 'Arte padrão',
+  removeLabel = 'Usar a arte padrão',
+  removable = true,
 }: {
   label: string;
   hint: string;
   value: string | null;
   onChange: (url: string | null) => void;
   disabled?: boolean;
+  // Padrão: imagem de banner. A logo da loja usa outra rota de upload.
+  upload?: (file: File) => Promise<{ url: string }>;
+  emptyLabel?: string;
+  removeLabel?: string;
+  // false: só dá para trocar a imagem (banner do carrossel, que precisa ter uma).
+  removable?: boolean;
 }) {
   const inputRef = useRef<HTMLInputElement>(null);
   const [uploading, setUploading] = useState(false);
@@ -71,7 +81,7 @@ export function ImageField({
     }
     setUploading(true);
     try {
-      const { url } = await uploadBannerImage(file);
+      const { url } = await upload(file);
       onChange(url);
     } catch (uploadError) {
       setError(getErrorMessage(uploadError));
@@ -88,7 +98,7 @@ export function ImageField({
           {value ? (
             <SafeImage src={value} alt="Imagem atual" className="h-full w-full object-cover" fallback={<Icon name="box" size={22} />} />
           ) : (
-            <span className="px-2 text-center text-[11px] leading-tight text-ink-400">Arte padrão</span>
+            <span className="px-2 text-center text-[11px] leading-tight text-ink-400">{emptyLabel}</span>
           )}
         </div>
         <div className="flex flex-col items-start gap-1.5">
@@ -101,14 +111,14 @@ export function ImageField({
           >
             {uploading ? 'Enviando...' : value ? 'Trocar imagem' : 'Enviar imagem'}
           </button>
-          {value && (
+          {value && removable && (
             <button
               type="button"
               onClick={() => onChange(null)}
               disabled={disabled || uploading}
               className="text-xs font-medium text-ink-500 transition hover:text-danger disabled:opacity-60"
             >
-              Usar a arte padrão
+              {removeLabel}
             </button>
           )}
         </div>

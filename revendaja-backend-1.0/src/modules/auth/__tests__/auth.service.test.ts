@@ -10,7 +10,9 @@ import type { SessionService } from '../../sessions/sessions.service';
 import { verifyGoogleIdToken } from '../google';
 
 jest.mock('../google');
-const mockedVerifyGoogleIdToken = verifyGoogleIdToken as jest.MockedFunction<typeof verifyGoogleIdToken>;
+const mockedVerifyGoogleIdToken = verifyGoogleIdToken as jest.MockedFunction<
+  typeof verifyGoogleIdToken
+>;
 
 function createUsersRepositoryMock(): jest.Mocked<UsersRepository> {
   return {
@@ -106,6 +108,7 @@ function buildStore(overrides: Partial<Store> = {}): Store {
     catalogLink: 'https://lealperfumaria.revendaja.com',
     isOnline: true,
     bio: null,
+    logo: null,
     plan: 'free',
     defaultMinStock: 0,
     createdAt: new Date(),
@@ -184,7 +187,9 @@ describe('AuthService', () => {
       const otp = createOtpServiceMock();
       users.findByEmail.mockResolvedValue(null);
       users.findByWhatsapp.mockResolvedValue(null);
-      users.create.mockImplementation((data) => buildUser(data).then((user) => ({ kind: 'created' as const, user })));
+      users.create.mockImplementation((data) =>
+        buildUser(data).then((user) => ({ kind: 'created' as const, user })),
+      );
       const service = new AuthService(
         users,
         createStoreRepositoryMock(),
@@ -214,7 +219,9 @@ describe('AuthService', () => {
       const sessions = createSessionServiceMock();
       users.findByEmail.mockResolvedValue(null);
       users.findByWhatsapp.mockResolvedValue(null);
-      users.create.mockImplementation((data) => buildUser(data).then((user) => ({ kind: 'created' as const, user })));
+      users.create.mockImplementation((data) =>
+        buildUser(data).then((user) => ({ kind: 'created' as const, user })),
+      );
       const service = new AuthService(
         users,
         createStoreRepositoryMock(),
@@ -237,7 +244,9 @@ describe('AuthService', () => {
       const otp = createOtpServiceMock();
       users.findByEmail.mockResolvedValue(null);
       users.findByWhatsapp.mockResolvedValue(null);
-      users.create.mockImplementation((data) => buildUser(data).then((user) => ({ kind: 'created' as const, user })));
+      users.create.mockImplementation((data) =>
+        buildUser(data).then((user) => ({ kind: 'created' as const, user })),
+      );
       otp.generateAndSend.mockRejectedValue(new Error('Resend fora do ar'));
       const service = new AuthService(
         users,
@@ -291,7 +300,9 @@ describe('AuthService', () => {
 
     it('lança UnauthorizedError quando a conta só tem login via Google (sem senha)', async () => {
       const users = createUsersRepositoryMock();
-      users.findByEmail.mockResolvedValue(await buildUser({ passwordHash: null, googleId: 'google-1' }));
+      users.findByEmail.mockResolvedValue(
+        await buildUser({ passwordHash: null, googleId: 'google-1' }),
+      );
       const service = new AuthService(
         users,
         createStoreRepositoryMock(),
@@ -363,12 +374,22 @@ describe('AuthService', () => {
       users.findByEmail.mockResolvedValue(null);
       stores.findByUserId.mockResolvedValue(null);
       users.createFromGoogle.mockImplementation((data) =>
-        buildUser({ ...data, whatsapp: null, passwordHash: null, phoneVerifiedAt: new Date() }).then((user) => ({
+        buildUser({
+          ...data,
+          whatsapp: null,
+          passwordHash: null,
+          phoneVerifiedAt: new Date(),
+        }).then((user) => ({
           kind: 'created' as const,
           user,
         })),
       );
-      const service = new AuthService(users, stores, createOtpServiceMock(), createSessionServiceMock());
+      const service = new AuthService(
+        users,
+        stores,
+        createOtpServiceMock(),
+        createSessionServiceMock(),
+      );
 
       const result = await service.loginWithGoogle('id-token');
 
@@ -421,7 +442,12 @@ describe('AuthService', () => {
       const sessions = createSessionServiceMock();
       const user = await buildUser({ googleId: 'google-1' });
       users.findByGoogleId.mockResolvedValue(user);
-      const service = new AuthService(users, createStoreRepositoryMock(), createOtpServiceMock(), sessions);
+      const service = new AuthService(
+        users,
+        createStoreRepositoryMock(),
+        createOtpServiceMock(),
+        sessions,
+      );
 
       await service.loginWithGoogle('id-token');
 
@@ -524,7 +550,10 @@ describe('AuthService', () => {
       const users = createUsersRepositoryMock();
       const user = await buildUser({ id: 'user-1', name: 'Ana' });
       users.findById.mockResolvedValue(user);
-      users.updateProfile.mockResolvedValue({ kind: 'updated', user: { ...user, name: 'Ana Souza' } });
+      users.updateProfile.mockResolvedValue({
+        kind: 'updated',
+        user: { ...user, name: 'Ana Souza' },
+      });
       const service = new AuthService(
         users,
         createStoreRepositoryMock(),

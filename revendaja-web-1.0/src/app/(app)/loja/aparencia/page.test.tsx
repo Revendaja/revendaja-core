@@ -23,7 +23,8 @@ vi.mock('@/lib/api/storefrontConfig', () => ({
 vi.mock('@/lib/api/storeCategories', () => ({ listStoreCategories: () => mocks.categories() }));
 vi.mock('@/lib/auth/AuthContext', () => ({ useAuth: () => ({ store: { id: 's1', handle: 'lealperfumaria' } }) }));
 
-const SECTIONS: StorefrontSection[] = ['announcement', 'hero', 'benefits', 'flash', 'collections'];
+const SECTIONS: StorefrontSection[] = ['announcement', 'banners', 'hero', 'benefits', 'flash', 'collections'];
+const ANNOUNCEMENT_TEXT = DEFAULT_CONFIG.announcement.text;
 
 function customization(customized: StorefrontSection[] = [], config: StorefrontConfig = DEFAULT_CONFIG): StorefrontCustomization {
   return {
@@ -58,7 +59,7 @@ function card(title: string) {
 
 async function renderLoaded() {
   renderWithQuery(<StorefrontAppearancePage />);
-  await screen.findByRole('heading', { name: 'Banner principal' });
+  await screen.findByRole('heading', { name: 'Barra de aviso' });
 }
 
 const saveButton = (title: string) => within(card(title)).getByRole('button', { name: /^Salv/ });
@@ -73,7 +74,7 @@ describe('Aparência da vitrine (editor)', () => {
   it('mostra as 5 seções, todas no padrão, e o link para ver a vitrine', async () => {
     await renderLoaded();
 
-    for (const title of ['Barra de aviso', 'Banner principal', 'Vantagens', 'Ofertas relâmpago', 'Coleções em destaque']) {
+    for (const title of ['Barra de aviso', 'Banners do topo', 'Vantagens', 'Ofertas relâmpago', 'Coleções em destaque']) {
       expect(within(card(title)).getByText('Padrão')).toBeInTheDocument();
     }
     expect(screen.getByRole('link', { name: /Ver minha vitrine/ })).toHaveAttribute('href', expect.stringContaining('lealperfumaria'));
@@ -82,9 +83,9 @@ describe('Aparência da vitrine (editor)', () => {
   it('preenche os campos com o que vale hoje (o padrão)', async () => {
     await renderLoaded();
 
-    expect(screen.getByLabelText('Título do banner')).toHaveValue('Beleza e cuidado');
-    expect(screen.getByLabelText('Destaque do banner')).toHaveValue('para o seu dia a dia');
-    expect(screen.getByLabelText('Texto da barra de aviso')).toHaveValue(DEFAULT_CONFIG.announcement.text);
+    expect(screen.getByLabelText('Texto da barra de aviso')).toHaveValue(ANNOUNCEMENT_TEXT);
+    expect(screen.getByLabelText('Destino do banner 1')).toHaveValue('section:offers');
+    expect(screen.getByLabelText('Destino do banner 3')).toHaveValue('none');
   });
 
   it('mostra o erro ao carregar e deixa tentar de novo', async () => {
@@ -95,105 +96,104 @@ describe('Aparência da vitrine (editor)', () => {
     mocks.get.mockResolvedValue(customization());
     await userEvent.click(screen.getByRole('button', { name: 'Tentar novamente' }));
 
-    expect(await screen.findByRole('heading', { name: 'Banner principal' })).toBeInTheDocument();
+    expect(await screen.findByRole('heading', { name: 'Barra de aviso' })).toBeInTheDocument();
   });
 
   describe('salvar uma seção', () => {
     it('Salvar começa desabilitado e só habilita depois de uma mudança', async () => {
       await renderLoaded();
-      expect(saveButton('Banner principal')).toBeDisabled();
+      expect(saveButton('Barra de aviso')).toBeDisabled();
 
-      await userEvent.type(screen.getByLabelText('Título do banner'), '!');
+      await userEvent.type(screen.getByLabelText('Texto da barra de aviso'), '!');
 
-      expect(saveButton('Banner principal')).toBeEnabled();
+      expect(saveButton('Barra de aviso')).toBeEnabled();
     });
 
     it('grava só a seção alterada e passa a mostrá-la como "Personalizado"', async () => {
       await renderLoaded();
-      const title = screen.getByLabelText('Título do banner');
+      const title = screen.getByLabelText('Texto da barra de aviso');
 
       await userEvent.clear(title);
       await userEvent.type(title, 'Black Friday');
-      await userEvent.click(saveButton('Banner principal'));
+      await userEvent.click(saveButton('Barra de aviso'));
 
       await waitFor(() => expect(mocks.update).toHaveBeenCalledTimes(1));
-      expect(mocks.update).toHaveBeenCalledWith({ hero: { ...DEFAULT_CONFIG.hero, title: 'Black Friday' } });
-      expect(await within(card('Banner principal')).findByText('Alterações salvas.')).toBeInTheDocument();
-      expect(within(card('Banner principal')).getByText('Personalizado')).toBeInTheDocument();
+      expect(mocks.update).toHaveBeenCalledWith({ announcement: { ...DEFAULT_CONFIG.announcement, text: 'Black Friday' } });
+      expect(await within(card('Barra de aviso')).findByText('Alterações salvas.')).toBeInTheDocument();
+      expect(within(card('Barra de aviso')).getByText('Personalizado')).toBeInTheDocument();
       // As outras seções continuam no padrão.
       expect(within(card('Vantagens')).getByText('Padrão')).toBeInTheDocument();
-      expect(saveButton('Banner principal')).toBeDisabled();
+      expect(saveButton('Barra de aviso')).toBeDisabled();
     });
 
     it('campo obrigatório vazio bloqueia o Salvar', async () => {
       await renderLoaded();
 
-      await userEvent.clear(screen.getByLabelText('Título do banner'));
+      await userEvent.clear(screen.getByLabelText('Texto da barra de aviso'));
 
-      expect(saveButton('Banner principal')).toBeDisabled();
+      expect(saveButton('Barra de aviso')).toBeDisabled();
     });
 
     it('só espaços também conta como vazio', async () => {
       await renderLoaded();
-      const title = screen.getByLabelText('Título do banner');
+      const title = screen.getByLabelText('Texto da barra de aviso');
 
       await userEvent.clear(title);
       await userEvent.type(title, '   ');
 
-      expect(saveButton('Banner principal')).toBeDisabled();
+      expect(saveButton('Barra de aviso')).toBeDisabled();
     });
 
     it('respeita o limite de caracteres do campo', async () => {
       await renderLoaded();
 
-      expect(screen.getByLabelText('Título do banner')).toHaveAttribute('maxLength', '60');
-      expect(screen.getByLabelText('Descrição do banner')).toHaveAttribute('maxLength', '160');
-      expect(screen.getByLabelText('Botão principal')).toHaveAttribute('maxLength', '24');
+      expect(screen.getByLabelText('Texto da barra de aviso')).toHaveAttribute('maxLength', '120');
+      expect(screen.getByLabelText('Texto do canto direito')).toHaveAttribute('maxLength', '80');
     });
 
     it('erro do servidor aparece na própria seção e o rascunho fica', async () => {
       await renderLoaded();
       mocks.update.mockRejectedValueOnce(new ApiError(400, 'VALIDATION_ERROR', 'Dados inválidos.'));
 
-      await userEvent.type(screen.getByLabelText('Título do banner'), '!');
-      await userEvent.click(saveButton('Banner principal'));
+      await userEvent.type(screen.getByLabelText('Texto da barra de aviso'), '!');
+      await userEvent.click(saveButton('Barra de aviso'));
 
-      expect(await within(card('Banner principal')).findByRole('alert')).toBeInTheDocument();
-      expect(screen.getByLabelText('Título do banner')).toHaveValue('Beleza e cuidado!');
-      expect(saveButton('Banner principal')).toBeEnabled();
+      expect(await within(card('Barra de aviso')).findByRole('alert')).toBeInTheDocument();
+      expect(screen.getByLabelText('Texto da barra de aviso')).toHaveValue(`${ANNOUNCEMENT_TEXT}!`);
+      expect(saveButton('Barra de aviso')).toBeEnabled();
     });
   });
 
   describe('restaurar o padrão', () => {
-    const custom = { ...DEFAULT_CONFIG, hero: { ...DEFAULT_CONFIG.hero, title: 'Meu título' } };
+    const custom = { ...DEFAULT_CONFIG, announcement: { ...DEFAULT_CONFIG.announcement, text: 'Meu título' } };
 
     it('desabilitado enquanto a seção está no padrão', async () => {
       await renderLoaded();
 
-      expect(resetButton('Banner principal')).toBeDisabled();
+      expect(resetButton('Barra de aviso')).toBeDisabled();
     });
 
     it('apaga a personalização, volta os campos ao padrão e avisa', async () => {
-      serverState(customization(['hero'], custom));
+      serverState(customization(['announcement'], custom));
       await renderLoaded();
-      expect(screen.getByLabelText('Título do banner')).toHaveValue('Meu título');
+      expect(screen.getByLabelText('Texto da barra de aviso')).toHaveValue('Meu título');
 
-      await userEvent.click(resetButton('Banner principal'));
+      await userEvent.click(resetButton('Barra de aviso'));
 
-      await waitFor(() => expect(mocks.update).toHaveBeenCalledWith({ hero: null }));
-      await waitFor(() => expect(screen.getByLabelText('Título do banner')).toHaveValue('Beleza e cuidado'));
-      expect(within(card('Banner principal')).getByText('Padrão')).toBeInTheDocument();
-      expect(resetButton('Banner principal')).toBeDisabled();
+      await waitFor(() => expect(mocks.update).toHaveBeenCalledWith({ announcement: null }));
+      await waitFor(() => expect(screen.getByLabelText('Texto da barra de aviso')).toHaveValue(ANNOUNCEMENT_TEXT));
+      expect(within(card('Barra de aviso')).getByText('Padrão')).toBeInTheDocument();
+      expect(resetButton('Barra de aviso')).toBeDisabled();
     });
 
     it('restaura só a seção escolhida', async () => {
-      serverState(customization(['hero', 'flash'], custom));
+      serverState(customization(['announcement', 'flash'], custom));
       await renderLoaded();
 
-      await userEvent.click(resetButton('Banner principal'));
+      await userEvent.click(resetButton('Barra de aviso'));
 
       await waitFor(() => expect(mocks.update).toHaveBeenCalledTimes(1));
-      expect(mocks.update).toHaveBeenCalledWith({ hero: null });
+      expect(mocks.update).toHaveBeenCalledWith({ announcement: null });
       expect(within(card('Ofertas relâmpago')).getByText('Personalizado')).toBeInTheDocument();
     });
   });
@@ -294,7 +294,7 @@ describe('Aparência da vitrine (editor)', () => {
       mocks.categories.mockResolvedValue({ items: [] });
       await renderLoaded();
 
-      expect((await screen.findAllByText(/Crie categorias em "Meus produtos"/)).length).toBe(2);
+      expect((await screen.findAllByText(/Crie categorias em "Meus produtos"/)).length).toBe(3);
     });
 
     it('link de marca (configurado por outro caminho) continua visível', async () => {
@@ -320,28 +320,41 @@ describe('Aparência da vitrine (editor)', () => {
     });
   });
 
-  describe('imagem do banner', () => {
+  describe('banners do topo', () => {
     const file = (name = 'banner.png', size = 1000) => new File([new Uint8Array(size)], name, { type: 'image/png' });
-    const heroInput = () => within(card('Banner principal')).getByLabelText('Imagem do banner') as HTMLInputElement;
+    const bannersCard = () => within(card('Banners do topo'));
+    const NEW_URL = 'https://cdn.test/users/u1/banners/x.png';
 
-    it('envia o arquivo, mostra a prévia e grava a URL ao salvar', async () => {
-      mocks.upload.mockResolvedValue({ url: 'https://cdn.test/users/u1/banners/x.png' });
+    it('lista os banners atuais, cada um com a imagem e o destino', async () => {
       await renderLoaded();
 
-      await userEvent.upload(heroInput(), file());
+      expect(bannersCard().getAllByText(/^Banner \d$/)).toHaveLength(3);
+      expect(bannersCard().getAllByAltText('Imagem atual')[0]).toHaveAttribute('src', DEFAULT_CONFIG.banners[0].imageUrl);
+      const labels = within(screen.getByLabelText('Destino do banner 2')).getAllByRole('option').map((option) => option.textContent);
+      expect(labels.slice(0, 2)).toEqual(['Nenhum (só a imagem)', 'Produtos em destaque']);
+    });
+
+    it('trocar a imagem de um banner envia o arquivo e grava a URL ao salvar', async () => {
+      mocks.upload.mockResolvedValue({ url: NEW_URL });
+      await renderLoaded();
+
+      await userEvent.upload(bannersCard().getByLabelText('Imagem do banner 1') as HTMLInputElement, file());
 
       await waitFor(() => expect(mocks.upload).toHaveBeenCalledTimes(1));
-      expect(await within(card('Banner principal')).findByAltText('Imagem atual')).toHaveAttribute('src', 'https://cdn.test/users/u1/banners/x.png');
-      await userEvent.click(saveButton('Banner principal'));
-      await waitFor(() => expect(mocks.update).toHaveBeenCalledWith({ hero: { ...DEFAULT_CONFIG.hero, imageUrl: 'https://cdn.test/users/u1/banners/x.png' } }));
+      await waitFor(() => expect(bannersCard().getAllByAltText('Imagem atual')[0]).toHaveAttribute('src', NEW_URL));
+      await userEvent.click(saveButton('Banners do topo'));
+      await waitFor(() => expect(mocks.update).toHaveBeenCalledTimes(1));
+      const sent = mocks.update.mock.calls[0][0].banners;
+      expect(sent[0]).toEqual({ imageUrl: NEW_URL, link: DEFAULT_CONFIG.banners[0].link });
+      expect(sent.slice(1)).toEqual(DEFAULT_CONFIG.banners.slice(1));
     });
 
     it('recusa arquivo maior que 5 MB sem nem enviar', async () => {
       await renderLoaded();
 
-      await userEvent.upload(heroInput(), file('grande.png', 6 * 1024 * 1024));
+      await userEvent.upload(bannersCard().getByLabelText('Imagem do banner 1') as HTMLInputElement, file('grande.png', 6 * 1024 * 1024));
 
-      expect(await within(card('Banner principal')).findByText('Imagem muito grande (máx. 5 MB).')).toBeInTheDocument();
+      expect(await bannersCard().findByText('Imagem muito grande (máx. 5 MB).')).toBeInTheDocument();
       expect(mocks.upload).not.toHaveBeenCalled();
     });
 
@@ -349,21 +362,66 @@ describe('Aparência da vitrine (editor)', () => {
       mocks.upload.mockRejectedValue(new ApiError(400, 'UNSUPPORTED_IMAGE_TYPE', 'Formato de imagem não suportado. Envie JPEG, PNG ou WEBP.'));
       await renderLoaded();
 
-      await userEvent.upload(heroInput(), file());
+      await userEvent.upload(bannersCard().getByLabelText('Imagem do banner 1') as HTMLInputElement, file());
 
-      expect(await within(card('Banner principal')).findByText('Formato de imagem não suportado. Envie JPEG, PNG ou WEBP.')).toBeInTheDocument();
-      expect(saveButton('Banner principal')).toBeDisabled();
+      expect(await bannersCard().findByText('Formato de imagem não suportado. Envie JPEG, PNG ou WEBP.')).toBeInTheDocument();
+      expect(saveButton('Banners do topo')).toBeDisabled();
     });
 
-    it('"Usar a arte padrão" tira a imagem (grava null)', async () => {
-      const custom = { ...DEFAULT_CONFIG, hero: { ...DEFAULT_CONFIG.hero, imageUrl: 'https://cdn.test/a.png' } };
-      serverState(customization(['hero'], custom));
+    it('adiciona um banner novo (sem link) ao final', async () => {
+      mocks.upload.mockResolvedValue({ url: NEW_URL });
       await renderLoaded();
 
-      await userEvent.click(within(card('Banner principal')).getByRole('button', { name: 'Usar a arte padrão' }));
-      await userEvent.click(saveButton('Banner principal'));
+      await userEvent.upload(bannersCard().getByLabelText('Adicionar banner') as HTMLInputElement, file());
 
-      await waitFor(() => expect(mocks.update).toHaveBeenCalledWith({ hero: { ...DEFAULT_CONFIG.hero, imageUrl: null } }));
+      await waitFor(() => expect(bannersCard().getAllByText(/^Banner \d$/)).toHaveLength(4));
+      await userEvent.click(saveButton('Banners do topo'));
+      await waitFor(() => expect(mocks.update).toHaveBeenCalledTimes(1));
+      const sent = mocks.update.mock.calls[0][0].banners;
+      expect(sent).toHaveLength(4);
+      expect(sent[3]).toEqual({ imageUrl: NEW_URL, link: null });
+    });
+
+    it('no limite de 5 banners o botão de adicionar fica desabilitado', async () => {
+      const banners = Array.from({ length: 5 }, (_, index) => ({ imageUrl: `https://cdn.test/${index}.png`, link: null }));
+      serverState(customization(['banners'], { ...DEFAULT_CONFIG, banners }));
+      await renderLoaded();
+
+      expect(bannersCard().getByRole('button', { name: 'Limite de 5 banners' })).toBeDisabled();
+    });
+
+    it('remove um banner, mas nunca o último', async () => {
+      await renderLoaded();
+
+      await userEvent.click(bannersCard().getByRole('button', { name: 'Remover o banner 2' }));
+      expect(bannersCard().getAllByText(/^Banner \d$/)).toHaveLength(2);
+      await userEvent.click(bannersCard().getByRole('button', { name: 'Remover o banner 2' }));
+
+      expect(bannersCard().getAllByText(/^Banner \d$/)).toHaveLength(1);
+      expect(bannersCard().getByRole('button', { name: 'Remover o banner 1' })).toBeDisabled();
+    });
+
+    it('muda a ordem e o destino (inclusive "Nenhum")', async () => {
+      await renderLoaded();
+
+      await userEvent.click(bannersCard().getByRole('button', { name: 'Descer o banner 1' }));
+      await userEvent.selectOptions(screen.getByLabelText('Destino do banner 1'), 'none');
+      await userEvent.click(saveButton('Banners do topo'));
+
+      await waitFor(() => expect(mocks.update).toHaveBeenCalledTimes(1));
+      const sent = mocks.update.mock.calls[0][0].banners;
+      expect(sent[0]).toEqual({ imageUrl: DEFAULT_CONFIG.banners[1].imageUrl, link: null });
+      expect(sent[1]).toEqual(DEFAULT_CONFIG.banners[0]);
+    });
+
+    it('restaurar o padrão grava null', async () => {
+      const custom = { ...DEFAULT_CONFIG, banners: [{ imageUrl: NEW_URL, link: null }] };
+      serverState(customization(['banners'], custom));
+      await renderLoaded();
+
+      await userEvent.click(resetButton('Banners do topo'));
+
+      await waitFor(() => expect(mocks.update).toHaveBeenCalledWith({ banners: null }));
     });
   });
 });

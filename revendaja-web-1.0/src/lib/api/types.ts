@@ -16,6 +16,8 @@ export type StoreInfo = {
   isOnline: boolean;
   // Descrição curta da loja (topo da vitrine). null = ainda não escreveu.
   bio: string | null;
+  // Logo da loja (URL). null = a vitrine mostra a inicial do nome.
+  logo: string | null;
   // Estoque mínimo aplicado automaticamente a cada NOVO produto adicionado. 0 = sem padrão.
   defaultMinStock: number;
   createdAt: string;
@@ -387,6 +389,7 @@ export type Storefront = {
     storeName: string;
     handle: string;
     bio: string | null;
+    logo: string | null;
     acceptedPaymentMethods: NewSalePaymentMethod[];
   };
   products: Paginated<StorefrontProduct>;
@@ -404,8 +407,14 @@ export type CollectionLink =
   | { type: 'category'; id: string }
   | { type: 'brand'; id: number };
 
+// Banner do topo da vitrine (carrossel). `link` null = só enfeite.
+export type StorefrontBanner = { imageUrl: string; link: CollectionLink | null };
+
+export const MAX_BANNERS = 5;
+
 export type StorefrontConfig = {
   announcement: { enabled: boolean; text: string; rightText: string | null };
+  banners: StorefrontBanner[];
   hero: {
     badge: string;
     title: string;
@@ -442,6 +451,7 @@ export type StorefrontHome = {
     storeName: string;
     handle: string;
     bio: string | null;
+    logo: string | null;
     acceptedPaymentMethods: NewSalePaymentMethod[];
     // Planos Pro e Empresarial tiram a marca do Revendajá do rodapé.
     hideBranding: boolean;

@@ -7,7 +7,8 @@
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "light",
     "ios": {
-      "supportsTablet": true
+      "supportsTablet": true,
+      "bundleIdentifier": "com.szreactioon.revendajamobile10"
     },
     "android": {
       "adaptiveIcon": {
@@ -49,7 +50,9 @@
           "color": "#fa3d02"
         }
       ],
-      "@react-native-google-signin/google-signin"
+      "@react-native-google-signin/google-signin",
+      "expo-status-bar",
+      "expo-font"
     ],
     "extra": {
       "eas": {

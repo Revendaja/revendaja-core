@@ -34,6 +34,7 @@ function buildStore(): Store {
     catalogLink: 'https://lealperfumaria.revendaja.com',
     isOnline: true,
     bio: null,
+    logo: null,
     plan: 'free',
     defaultMinStock: 0,
     createdAt: new Date(),

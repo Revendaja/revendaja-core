@@ -1,5 +1,10 @@
 import { StoreService } from '../store.service';
-import { AppError, ConflictError, NotFoundError, PlanLimitError } from '../../../shared/errors/AppError';
+import {
+  AppError,
+  ConflictError,
+  NotFoundError,
+  PlanLimitError,
+} from '../../../shared/errors/AppError';
 import type { CatalogRepository } from '../../catalog/catalog.repository';
 import type { CatalogProduct } from '../../catalog/catalog.types';
 import type { StoreRepository } from '../store.repository';
@@ -58,6 +63,7 @@ function buildStore(overrides: Partial<Store> = {}): Store {
     catalogLink: 'https://lealperfumaria.revendaja.com',
     isOnline: true,
     bio: null,
+    logo: null,
     // Pro por padrão nos testes: sem limite de produtos e com tudo liberado, a menos que o teste
     // troque o plano de propósito pra exercitar um limite específico.
     plan: 'premium',
@@ -128,7 +134,9 @@ describe('StoreService', () => {
     const repository = createRepositoryMock();
     repository.findByUserId.mockResolvedValue(null);
     repository.findByHandle.mockResolvedValue(null);
-    repository.create.mockImplementation((data) => Promise.resolve({ kind: 'created' as const, store: buildStore(data) }));
+    repository.create.mockImplementation((data) =>
+      Promise.resolve({ kind: 'created' as const, store: buildStore(data) }),
+    );
     const service = new StoreService(repository);
 
     const store = await service.createStore('user-1', 'Leal Perfumaria');
@@ -147,7 +155,9 @@ describe('StoreService', () => {
           : null,
       ),
     );
-    repository.create.mockImplementation((data) => Promise.resolve({ kind: 'created' as const, store: buildStore(data) }));
+    repository.create.mockImplementation((data) =>
+      Promise.resolve({ kind: 'created' as const, store: buildStore(data) }),
+    );
     const service = new StoreService(repository);
 
     const store = await service.createStore('user-1', 'Leal Perfumaria');
@@ -159,7 +169,9 @@ describe('StoreService', () => {
     const repository = createRepositoryMock();
     repository.findByUserId.mockResolvedValue(null);
     repository.findByHandle.mockResolvedValue(null);
-    repository.create.mockImplementation((data) => Promise.resolve({ kind: 'created' as const, store: buildStore(data) }));
+    repository.create.mockImplementation((data) =>
+      Promise.resolve({ kind: 'created' as const, store: buildStore(data) }),
+    );
     const service = new StoreService(repository);
 
     const store = await service.createStore('user-1', '🎉🎉🎉');
@@ -810,6 +822,23 @@ describe('StoreService', () => {
       await service.updateStore('user-1', { bio });
 
       expect(repository.updateStore).toHaveBeenCalledWith(store.id, { bio: null });
+    });
+
+    it('logo: grava a nova, ignora a igual e null remove', async () => {
+      const { repository, store, service } = setup({
+        logo: 'https://cdn.revendaja.com/logo-a.png',
+      });
+
+      await service.updateStore('user-1', { logo: 'https://cdn.revendaja.com/logo-a.png' });
+      expect(repository.updateStore).not.toHaveBeenCalled();
+
+      await service.updateStore('user-1', { logo: 'https://cdn.revendaja.com/logo-b.png' });
+      expect(repository.updateStore).toHaveBeenLastCalledWith(store.id, {
+        logo: 'https://cdn.revendaja.com/logo-b.png',
+      });
+
+      await service.updateStore('user-1', { logo: null });
+      expect(repository.updateStore).toHaveBeenLastCalledWith(store.id, { logo: null });
     });
 
     it('trocar o link (handle) troca o catalogLink junto', async () => {

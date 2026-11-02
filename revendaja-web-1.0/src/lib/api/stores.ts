@@ -1,4 +1,5 @@
 import { request } from './http';
+import { uploadImage } from './storeProducts';
 import type { StoreInfo, StorePlanUsage, StoreSettings, StoreSettingsChanges, StoreStats } from './types';
 
 // O usuário informa só o nome: o handle e o link da vitrine são gerados pelo backend.
@@ -34,6 +35,8 @@ export type StoreChanges = {
   handle?: string;
   // Vazio ou null limpa a descrição (até 280 caracteres).
   bio?: string | null;
+  // URL devolvida por uploadStoreLogo. null remove a logo.
+  logo?: string | null;
   // Estoque mínimo padrão pra cada NOVO produto adicionado. 0 = desligado.
   defaultMinStock?: number;
 };
@@ -51,4 +54,9 @@ export function getStoreSettings() {
 // Envie só o que mudou. `acceptedPaymentMethods` precisa ter ao menos uma forma de pagamento.
 export function updateStoreSettings(changes: StoreSettingsChanges) {
   return request<StoreSettings>('/store/settings', { method: 'PATCH', body: changes, auth: true });
+}
+
+// Logo da loja: sobe para o nosso bucket e devolve a URL (que vai em `updateStore({ logo })`).
+export function uploadStoreLogo(file: File) {
+  return uploadImage('/uploads/store-logo', file);
 }

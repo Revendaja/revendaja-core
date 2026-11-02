@@ -65,3 +65,110 @@ body {
     animation: none;
   }
 }
+
+/* Landing: entrada escalonada do hero (atraso via --delay) e zoom lento no fundo. */
+@keyframes hero-in {
+  from {
+    opacity: 0;
+    transform: translateY(24px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes hero-down {
+  from {
+    opacity: 0;
+    transform: translateY(-16px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes hero-bg {
+  from {
+    opacity: 0;
+    transform: scale(1.12);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+.hero-in {
+  animation: hero-in 0.8s cubic-bezier(0.22, 1, 0.36, 1) both;
+  animation-delay: var(--delay, 0s);
+}
+
+.hero-down {
+  animation: hero-down 0.7s cubic-bezier(0.22, 1, 0.36, 1) both;
+  animation-delay: var(--delay, 0s);
+}
+
+.hero-bg {
+  animation: hero-bg 1.8s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .hero-in,
+  .hero-down,
+  .hero-bg {
+    animation: none;
+  }
+}
+
+/* Landing: carrossel infinito de marcas. O trilho tem 4 cópias; andar 1/4 volta ao mesmo ponto. */
+@keyframes brands-scroll {
+  to {
+    transform: translateX(-25%);
+  }
+}
+
+.brands-track {
+  animation: brands-scroll 25s linear infinite;
+}
+
+.brands-marquee:hover .brands-track {
+  animation-play-state: paused;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .brands-track {
+    animation: none;
+  }
+}
+
+/* Landing: itens aparecem ao entrar na tela (onde há suporte a scroll-driven animations). */
+@supports (animation-timeline: view()) {
+  .reveal {
+    animation: hero-in linear both;
+    animation-timeline: view();
+    animation-range: entry 0% entry 45%;
+  }
+}
+
+@keyframes showcase-float {
+  0%,
+  100% {
+    transform: translateY(0);
+  }
+  50% {
+    transform: translateY(-12px);
+  }
+}
+
+.showcase-float {
+  animation: showcase-float 6s ease-in-out infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .reveal,
+  .showcase-float {
+    animation: none;
+  }
+}

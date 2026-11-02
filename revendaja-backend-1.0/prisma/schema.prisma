@@ -106,6 +106,9 @@ model Store {
   isOnline                Boolean         @default(true) @map("is_online")
   // Descrição curta da loja: aparece no topo da vitrine e é editada em "Editar Loja". Opcional.
   bio                     String?
+  // Logo da loja (topo da vitrine). URL de uma imagem enviada por /uploads/store-logo. Null = a vitrine
+  // mostra a inicial do nome da loja.
+  logo                    String?
   // Última numeração de venda usada (Venda #N). Incrementado dentro da transação
   // da venda: o UPDATE trava a linha da loja, então duas vendas simultâneas nunca
   // recebem o mesmo número.

@@ -25,6 +25,7 @@ const STORE = {
   catalogLink: 'https://lealperfumaria.revendaja.com',
   isOnline: true,
   bio: null,
+  logo: null,
   createdAt: new Date(),
 };
 

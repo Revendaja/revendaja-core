@@ -6,7 +6,7 @@ import { BenefitsStrip } from './BenefitsStrip';
 import { CategoryShelf } from './CategoryShelf';
 import { CollectionBanners } from './CollectionBanners';
 import { Countdown, FlashSale } from './FlashSale';
-import { HeroBanner } from './HeroBanner';
+import { BannerCarousel } from './BannerCarousel';
 import { ProductCard } from './ProductCard';
 import { SafeImage } from './SafeImage';
 import { StorefrontFooter } from './StorefrontFooter';
@@ -98,6 +98,19 @@ describe('StorefrontHeader', () => {
     { id: 'ofertas', label: 'Ofertas' },
   ];
 
+  function baseProps(): React.ComponentProps<typeof StorefrontHeader> {
+    return {
+      storeName: 'Leal Perfumaria',
+      announcement: DEFAULT_CONFIG.announcement,
+      acceptedPaymentMethods: ['pix'],
+      sections: [],
+      query: '',
+      onQueryChange: vi.fn(),
+      cartCount: 0,
+      onOpenCart: vi.fn(),
+    };
+  }
+
   function setup(overrides: Partial<React.ComponentProps<typeof StorefrontHeader>> = {}) {
     const props = {
       storeName: 'Leal Perfumaria',
@@ -151,6 +164,85 @@ describe('StorefrontHeader', () => {
     expect(props.onQueryChange).toHaveBeenLastCalledWith('');
   });
 
+  it('sem conta: cumprimenta "Visitante" e, depois do primeiro pedido, o primeiro nome', () => {
+    const { unmount } = render(
+      <StorefrontHeader {...baseProps()} />,
+    );
+    expect(screen.getByText('Visitante')).toBeInTheDocument();
+    expect(screen.queryByText(/Entrar/)).not.toBeInTheDocument();
+    unmount();
+
+    render(<StorefrontHeader {...baseProps()} customerName="Maria da Silva" />);
+    expect(screen.getByText('Maria')).toBeInTheDocument();
+  });
+
+  it('categorias do estoque: "Todos" + cada uma, e clicar filtra', async () => {
+    const onSelectCategory = vi.fn();
+    const onClearCategory = vi.fn();
+    render(
+      <StorefrontHeader
+        {...baseProps()}
+        categories={[
+          { type: 'category', id: 'c1', name: 'Perfumaria', count: 4, image: null },
+          { type: 'brand', id: '7', name: 'Natura', count: 2, image: null },
+        ]}
+        activeFilter={{ type: 'brand', id: '7' }}
+        onSelectCategory={onSelectCategory}
+        onClearCategory={onClearCategory}
+      />,
+    );
+
+    await userEvent.click(screen.getByRole('button', { name: 'Perfumaria' }));
+    await userEvent.click(screen.getByRole('button', { name: 'Todos' }));
+
+    expect(onSelectCategory).toHaveBeenCalledWith({ type: 'category', id: 'c1' });
+    expect(onClearCategory).toHaveBeenCalledTimes(1);
+    expect(screen.getByRole('button', { name: 'Natura' })).toHaveAttribute('aria-pressed', 'true');
+  });
+
+  it('CEP: consulta o endereço e devolve para a vitrine guardar', async () => {
+    const onCepChange = vi.fn();
+    vi.stubGlobal(
+      'fetch',
+      vi.fn().mockResolvedValue({
+        ok: true,
+        json: async () => ({ logradouro: 'Av. Paulista', bairro: 'Bela Vista', localidade: 'São Paulo', uf: 'SP' }),
+      }),
+    );
+    render(<StorefrontHeader {...baseProps()} onCepChange={onCepChange} />);
+
+    await userEvent.click(screen.getByRole('button', { name: 'Informar CEP' }));
+    await userEvent.type(screen.getByLabelText('CEP'), '01310100');
+    await userEvent.click(screen.getByRole('button', { name: 'Aplicar' }));
+
+    expect(fetch).toHaveBeenCalledWith('https://viacep.com.br/ws/01310100/json/', expect.anything());
+    expect(onCepChange).toHaveBeenCalledWith({
+      cep: '01310100',
+      street: 'Av. Paulista',
+      district: 'Bela Vista',
+      city: 'São Paulo',
+      state: 'SP',
+    });
+    vi.unstubAllGlobals();
+  });
+
+  it('CEP inválido ou inexistente mostra o erro e não salva', async () => {
+    const onCepChange = vi.fn();
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue({ ok: true, json: async () => ({ erro: true }) }));
+    render(<StorefrontHeader {...baseProps()} onCepChange={onCepChange} />);
+
+    await userEvent.click(screen.getByRole('button', { name: 'Informar CEP' }));
+    await userEvent.type(screen.getByLabelText('CEP'), '123');
+    await userEvent.click(screen.getByRole('button', { name: 'Aplicar' }));
+    expect(screen.getByRole('alert')).toHaveTextContent('Digite os 8 números do CEP.');
+
+    await userEvent.type(screen.getByLabelText('CEP'), '45678');
+    await userEvent.click(screen.getByRole('button', { name: 'Aplicar' }));
+    expect(await screen.findByRole('alert')).toHaveTextContent('CEP não encontrado.');
+    expect(onCepChange).not.toHaveBeenCalled();
+    vi.unstubAllGlobals();
+  });
+
   it('carrinho: mostra a quantidade e abre ao clicar', async () => {
     const props = setup({ cartCount: 3 });
 
@@ -161,73 +253,96 @@ describe('StorefrontHeader', () => {
   });
 });
 
-describe('HeroBanner', () => {
-  function setup(overrides: Partial<React.ComponentProps<typeof HeroBanner>> = {}) {
-    const props = {
-      hero: DEFAULT_CONFIG.hero,
-      images: ['https://img.test/a.jpg', 'https://img.test/b.jpg'],
-      maxDiscount: 0,
-      productCount: 586,
-      hasOffers: false,
-      onPrimary: vi.fn(),
-      onSecondary: vi.fn(),
-      ...overrides,
-    };
-    const view = render(<HeroBanner {...props} />);
-    return { props, ...view };
+describe('BannerCarousel', () => {
+  const banners = [
+    { imageUrl: 'https://img.test/b1.jpg', link: { type: 'section' as const, section: 'offers' as const } },
+    { imageUrl: 'https://img.test/b2.jpg', link: null },
+    { imageUrl: 'https://img.test/b3.jpg', link: { type: 'category' as const, id: 'c1' } },
+  ];
+
+  function setup(list = banners) {
+    const onOpen = vi.fn();
+    render(<BannerCarousel banners={list} storeName="Leal" onOpen={onOpen} />);
+    return { onOpen };
   }
 
-  it('mostra os textos do banner e a quantidade de produtos', () => {
+  // O slide fica fora da tela (inert + aria-hidden) até a vez dele.
+  const visibleSlide = () => screen.getByRole('group', { hidden: false, name: /de 3$/ });
+
+  afterEach(() => vi.useRealTimers());
+
+  it('mostra as setas e os pontos quando há mais de um banner', () => {
     setup();
 
-    expect(screen.getByRole('heading', { level: 1 })).toHaveTextContent('Beleza e cuidado para o seu dia a dia');
-    expect(screen.getByText('NOVIDADES DA LOJA')).toBeInTheDocument();
-    expect(screen.getByText('586')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Banner anterior' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Próximo banner' })).toBeInTheDocument();
+    expect(screen.getAllByRole('button', { name: /^Ir para o banner/ })).toHaveLength(3);
   });
 
-  it('botão de ofertas só aparece quando há promoção', () => {
-    const { unmount } = setup({ hasOffers: false });
-    expect(screen.queryByRole('button', { name: 'Ver ofertas' })).not.toBeInTheDocument();
-    unmount();
-
-    setup({ hasOffers: true });
-    expect(screen.getByRole('button', { name: 'Ver ofertas' })).toBeInTheDocument();
+  it('com um banner só: sem setas nem pontos; sem nenhum: não renderiza', () => {
+    const { onOpen } = setup([banners[0]]);
+    expect(screen.queryByRole('button', { name: 'Próximo banner' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /^Ir para o banner/ })).not.toBeInTheDocument();
+    expect(onOpen).not.toHaveBeenCalled();
   });
 
-  it('os botões chamam as ações', async () => {
-    const { props } = setup({ hasOffers: true });
+  it('não renderiza nada sem banners', () => {
+    const { container } = render(<BannerCarousel banners={[]} storeName="Leal" onOpen={vi.fn()} />);
 
-    await userEvent.click(screen.getByRole('button', { name: /Ver produtos/ }));
-    await userEvent.click(screen.getByRole('button', { name: 'Ver ofertas' }));
-
-    expect(props.onPrimary).toHaveBeenCalledTimes(1);
-    expect(props.onSecondary).toHaveBeenCalledTimes(1);
+    expect(container).toBeEmptyDOMElement();
   });
 
-  it('selo "até X% off" só quando há desconto', () => {
-    const { unmount } = setup({ maxDiscount: 0 });
-    expect(screen.queryByLabelText(/Até .*% de desconto/)).not.toBeInTheDocument();
-    unmount();
+  it('as setas passam de um lado para o outro, dando a volta', async () => {
+    setup();
+    expect(visibleSlide()).toHaveAttribute('aria-label', '1 de 3');
 
-    setup({ maxDiscount: 40 });
-    expect(screen.getByLabelText('Até 40% de desconto')).toBeInTheDocument();
+    await userEvent.click(screen.getByRole('button', { name: 'Próximo banner' }));
+    expect(visibleSlide()).toHaveAttribute('aria-label', '2 de 3');
+
+    await userEvent.click(screen.getByRole('button', { name: 'Banner anterior' }));
+    await userEvent.click(screen.getByRole('button', { name: 'Banner anterior' }));
+    expect(visibleSlide()).toHaveAttribute('aria-label', '3 de 3');
   });
 
-  it('com imagem da loja usa ela; sem imagem monta a arte com as fotos dos produtos', () => {
-    const { container, unmount } = setup({ hero: { ...DEFAULT_CONFIG.hero, imageUrl: 'https://cdn.test/banner.jpg' } });
-    expect(container.querySelector('img[src="https://cdn.test/banner.jpg"]')).not.toBeNull();
-    expect(container.querySelector('img[src="https://img.test/a.jpg"]')).toBeNull();
-    unmount();
+  it('os pontos levam direto ao banner', async () => {
+    setup();
 
-    const { container: art } = setup();
-    expect(art.querySelector('img[src="https://img.test/a.jpg"]')).not.toBeNull();
-    expect(art.querySelector('img[src="https://img.test/b.jpg"]')).not.toBeNull();
+    await userEvent.click(screen.getByRole('button', { name: 'Ir para o banner 3' }));
+
+    expect(visibleSlide()).toHaveAttribute('aria-label', '3 de 3');
   });
 
-  it('sem fotos nem imagem, mostra um ícone em vez de quebrar', () => {
-    const { container } = setup({ images: [] });
+  it('passa sozinho a cada 6 segundos e para quando o mouse está em cima', () => {
+    vi.useFakeTimers();
+    setup();
 
-    expect(container.querySelectorAll('img')).toHaveLength(0);
+    act(() => void vi.advanceTimersByTime(6000));
+    expect(visibleSlide()).toHaveAttribute('aria-label', '2 de 3');
+
+    fireEvent.mouseEnter(screen.getByRole('region', { name: 'Destaques da loja' }));
+    act(() => void vi.advanceTimersByTime(20000));
+    expect(visibleSlide()).toHaveAttribute('aria-label', '2 de 3');
+
+    fireEvent.mouseLeave(screen.getByRole('region', { name: 'Destaques da loja' }));
+    act(() => void vi.advanceTimersByTime(6000));
+    expect(visibleSlide()).toHaveAttribute('aria-label', '3 de 3');
+  });
+
+  it('clicar no banner com link avisa o destino; sem link a imagem não é botão', async () => {
+    const { onOpen } = setup();
+
+    await userEvent.click(screen.getByRole('button', { name: 'Ver mais: banner 1' }));
+    expect(onOpen).toHaveBeenCalledWith(banners[0]);
+
+    expect(screen.queryByRole('button', { name: 'Ver mais: banner 2' })).not.toBeInTheDocument();
+  });
+
+  it('imagem que não carrega vira um fundo neutro (sem ícone quebrado)', () => {
+    setup([banners[0], banners[1]]);
+
+    fireEvent.error(screen.getByAltText('Leal: banner 1 de 2'));
+
+    expect(screen.queryByAltText('Leal: banner 1 de 2')).not.toBeInTheDocument();
   });
 });
 

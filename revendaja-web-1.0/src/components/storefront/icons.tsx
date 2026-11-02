@@ -31,6 +31,13 @@ export const TruckIcon = (props: SvgProps) => (
   </Svg>
 );
 
+export const PinIcon = (props: SvgProps) => (
+  <Svg {...props}>
+    <path d="M12 21s7-6.2 7-11.5A7 7 0 0 0 5 9.5C5 14.8 12 21 12 21z" />
+    <circle cx="12" cy="9.5" r="2.5" />
+  </Svg>
+);
+
 export const CardIcon = (props: SvgProps) => (
   <Svg {...props}>
     <rect x="2.5" y="5" width="19" height="14" rx="2.5" />

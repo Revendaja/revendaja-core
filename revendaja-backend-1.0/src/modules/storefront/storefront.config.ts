@@ -11,7 +11,7 @@ const text = (max: number) => z.string().trim().min(1).max(max);
 
 // Imagens vêm do nosso próprio upload (S3): aceitar qualquer URL deixaria a loja pôr rastreador ou
 // conteúdo de terceiros na vitrine. Sem S3 configurado (dev) vale qualquer URL https.
-const imageUrl = z
+export const imageUrl = z
   .string()
   .trim()
   .url()
@@ -22,6 +22,16 @@ const imageUrl = z
   .refine((value) => !env.S3_PUBLIC_BASE_URL || value.startsWith(env.S3_PUBLIC_BASE_URL), {
     message: 'Use uma imagem enviada pelo painel.',
   });
+
+// Banners de exemplo (fotos públicas) que a vitrine mostra até a loja enviar os dela. São os únicos
+// links externos aceitos nos banners: o resto precisa vir do upload do painel.
+export const DEFAULT_BANNER_IMAGES = [
+  'https://images.unsplash.com/photo-1596462502278-27bfdc403348?auto=format&fit=crop&w=1920&h=600&q=75',
+  'https://images.unsplash.com/photo-1487412947147-5cebf100ffc2?auto=format&fit=crop&w=1920&h=600&q=75',
+  'https://images.unsplash.com/photo-1522335789203-aabd1fc54bc9?auto=format&fit=crop&w=1920&h=600&q=75',
+] as const;
+
+export const MAX_BANNERS = 5;
 
 export const BENEFIT_ICONS = ['truck', 'card', 'shield', 'chat', 'gift', 'star'] as const;
 export const COLLECTION_SECTIONS = ['featured', 'offers', 'new', 'catalog'] as const;
@@ -47,6 +57,21 @@ const heroSchema = z.object({
   imageUrl: imageUrl.nullable(),
 });
 
+const collectionLinkSchema = z.discriminatedUnion('type', [
+  z.object({ type: z.literal('section'), section: z.enum(COLLECTION_SECTIONS) }),
+  z.object({ type: z.literal('category'), id: z.string().uuid() }),
+  z.object({ type: z.literal('brand'), id: z.coerce.number().int().positive() }),
+]);
+
+// Imagem de um banner do topo: upload da loja ou um dos banners de exemplo.
+const bannerImageSchema = z.union([imageUrl, z.enum(DEFAULT_BANNER_IMAGES)]);
+
+const bannerSchema = z.object({
+  imageUrl: bannerImageSchema,
+  // Para onde o clique leva (seção, categoria ou marca). null = banner só de enfeite.
+  link: collectionLinkSchema.nullable(),
+});
+
 const benefitSchema = z.object({
   icon: z.enum(BENEFIT_ICONS),
   title: text(30),
@@ -60,12 +85,6 @@ const flashSchema = z.object({
   imageUrl: imageUrl.nullable(),
 });
 
-const collectionLinkSchema = z.discriminatedUnion('type', [
-  z.object({ type: z.literal('section'), section: z.enum(COLLECTION_SECTIONS) }),
-  z.object({ type: z.literal('category'), id: z.string().uuid() }),
-  z.object({ type: z.literal('brand'), id: z.coerce.number().int().positive() }),
-]);
-
 const collectionSchema = z.object({
   title: text(40),
   subtitle: text(80),
@@ -76,6 +95,7 @@ const collectionSchema = z.object({
 
 export const storefrontConfigSchema = z.object({
   announcement: announcementSchema,
+  banners: z.array(bannerSchema).min(1).max(MAX_BANNERS),
   hero: heroSchema,
   benefits: z.array(benefitSchema).length(4),
   flash: flashSchema,
@@ -89,6 +109,7 @@ export const storefrontOverridesSchema = storefrontConfigSchema.partial();
 export const updateStorefrontConfigSchema = z
   .object({
     announcement: announcementSchema.nullable(),
+    banners: z.array(bannerSchema).min(1).max(MAX_BANNERS).nullable(),
     hero: heroSchema.nullable(),
     benefits: z.array(benefitSchema).length(4).nullable(),
     flash: flashSchema.nullable(),
@@ -104,6 +125,7 @@ export type StorefrontSection = keyof StorefrontConfig;
 
 export const STOREFRONT_SECTIONS: readonly StorefrontSection[] = [
   'announcement',
+  'banners',
   'hero',
   'benefits',
   'flash',
@@ -119,6 +141,11 @@ export function buildDefaultConfig(storeName: string): StorefrontConfig {
       text: `Bem-vinda à ${storeName}! Escolha seus produtos e faça o pedido pelo site.`,
       rightText: null,
     },
+    banners: [
+      { imageUrl: DEFAULT_BANNER_IMAGES[0], link: { type: 'section', section: 'offers' } },
+      { imageUrl: DEFAULT_BANNER_IMAGES[1], link: { type: 'section', section: 'new' } },
+      { imageUrl: DEFAULT_BANNER_IMAGES[2], link: { type: 'section', section: 'catalog' } },
+    ],
     hero: {
       badge: 'NOVIDADES DA LOJA',
       title: 'Beleza e cuidado',

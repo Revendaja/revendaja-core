@@ -43,7 +43,7 @@ describe('Vitrine (StorefrontView)', () => {
     it('loja completa: banner, vantagens, categorias, destaques, ofertas, coleções, novidades e catálogo', () => {
       setup();
 
-      expect(screen.getByRole('heading', { level: 1 })).toHaveTextContent('Beleza e cuidado para o seu dia a dia');
+      expect(screen.getByRole('region', { name: 'Destaques da loja' })).toBeInTheDocument();
       expect(screen.getByRole('region', { name: 'Vantagens' })).toBeInTheDocument();
       for (const name of ['Categorias', 'Produtos em destaque', 'Ofertas', 'Coleções em destaque', 'Novidades', 'Todos os produtos']) {
         expect(region(name)).toBeInTheDocument();
@@ -61,12 +61,11 @@ describe('Vitrine (StorefrontView)', () => {
       expect(within(region('Todos os produtos')).getAllByRole('article')).toHaveLength(24);
     });
 
-    it('sem ofertas: não aparece a faixa de ofertas, nem o botão de ofertas do banner, nem o menu "Ofertas"', () => {
+    it('sem ofertas: não aparece a faixa de ofertas, nem o menu "Ofertas"', () => {
       setup(homeData({ offers: { products: [], endsAt: null } }));
 
       expect(screen.queryByRole('region', { name: 'Ofertas' })).not.toBeInTheDocument();
       expect(screen.queryByRole('region', { name: 'Ofertas relâmpago' })).not.toBeInTheDocument();
-      expect(screen.queryByRole('button', { name: 'Ver ofertas' })).not.toBeInTheDocument();
       expect(screen.queryByRole('button', { name: 'Ofertas' })).not.toBeInTheDocument();
     });
 
@@ -101,18 +100,18 @@ describe('Vitrine (StorefrontView)', () => {
       expect(screen.queryByRole('region', { name: 'Coleções em destaque' })).not.toBeInTheDocument();
     });
 
-    it('banners personalizados: mostra os textos da loja no lugar dos padrões', () => {
+    it('banners e aviso personalizados: mostra os da loja no lugar dos padrões', () => {
       setup(
         homeData({
           config: {
             ...DEFAULT_CONFIG,
-            hero: { ...DEFAULT_CONFIG.hero, title: 'Black Friday', highlight: 'só esta semana' },
+            banners: [{ imageUrl: 'https://img.test/black-friday.jpg', link: null }],
             announcement: { enabled: true, text: 'Frete grátis hoje!', rightText: null },
           },
         }),
       );
 
-      expect(screen.getByRole('heading', { level: 1 })).toHaveTextContent('Black Friday só esta semana');
+      expect(screen.getByAltText('Leal Perfumaria: banner 1 de 1')).toHaveAttribute('src', 'https://img.test/black-friday.jpg');
       expect(screen.getByText('Frete grátis hoje!')).toBeInTheDocument();
     });
 
@@ -252,15 +251,23 @@ describe('Vitrine (StorefrontView)', () => {
     });
   });
 
-  describe('botões do banner', () => {
-    it('"Ver produtos" vai ao catálogo e "Ver ofertas" às ofertas', async () => {
+  describe('cliques nos banners', () => {
+    it('banner com link leva à seção (ofertas) e o sem link não faz nada', async () => {
       setup();
 
-      await userEvent.click(within(region('Destaque da loja')).getByRole('button', { name: /Ver produtos/ }));
-      expect(lastScrolledId()).toBe('produtos');
-
-      await userEvent.click(within(region('Destaque da loja')).getByRole('button', { name: 'Ver ofertas' }));
+      await userEvent.click(within(region('Destaques da loja')).getByRole('button', { name: 'Ver mais: banner 1' }));
       expect(lastScrolledId()).toBe('ofertas');
+
+      // O terceiro banner do exemplo não tem link: não é botão.
+      expect(within(region('Destaques da loja')).queryByRole('button', { name: 'Ver mais: banner 3' })).not.toBeInTheDocument();
+    });
+
+    it('banner que aponta para uma seção que a loja não tem cai no catálogo', async () => {
+      setup(homeData({ offers: { products: [], endsAt: null } }));
+
+      await userEvent.click(within(region('Destaques da loja')).getByRole('button', { name: 'Ver mais: banner 1' }));
+
+      expect(lastScrolledId()).toBe('produtos');
     });
   });
 

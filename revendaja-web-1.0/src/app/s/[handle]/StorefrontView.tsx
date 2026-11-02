@@ -10,6 +10,7 @@ import {
 } from '@/lib/api/public';
 import { getErrorMessage } from '@/lib/api/errors';
 import type {
+  CollectionLink,
   FulfillmentMethod,
   NewSalePaymentMethod,
   OnlineOrderReceipt,
@@ -31,6 +32,15 @@ import {
   resolveLink,
   scrollToSection,
 } from '@/lib/storefront/home';
+import {
+  addressFromCep,
+  readSavedCep,
+  readSavedCustomer,
+  writeSavedCep,
+  writeSavedCustomer,
+  type SavedCustomer,
+  type VisitorCep,
+} from '@/lib/storefront/visitor';
 import { useDebouncedValue } from '@/hooks/useDebouncedValue';
 import { useSubmitting } from '@/hooks/useSubmitting';
 import { Icon } from '@/components/dashboard/icons';
@@ -39,7 +49,7 @@ import { BenefitsStrip } from '@/components/storefront/BenefitsStrip';
 import { CategoryShelf } from '@/components/storefront/CategoryShelf';
 import { CollectionBanners, type CollectionView } from '@/components/storefront/CollectionBanners';
 import { FlashSale } from '@/components/storefront/FlashSale';
-import { HeroBanner } from '@/components/storefront/HeroBanner';
+import { BannerCarousel } from '@/components/storefront/BannerCarousel';
 import { ProductGrid, SectionHeader, unitPrice } from '@/components/storefront/ProductCard';
 import { StorefrontFooter } from '@/components/storefront/StorefrontFooter';
 import { StorefrontHeader, type NavSection } from '@/components/storefront/StorefrontHeader';
@@ -52,47 +62,6 @@ const MAX_INSTALLMENTS = 12;
 const NAME_MAX = 120;
 const ADDRESS_MIN = 8;
 const ADDRESS_MAX = 300;
-
-// Dados do cliente guardados neste aparelho depois do primeiro pedido, para ele não digitar tudo de
-// novo. Fica só no localStorage do navegador (nunca vai para o servidor por conta própria) e a
-// vitrine de cada loja tem o seu (cada subdomínio é uma origem separada). O troco NÃO é guardado:
-// vale só para aquele pedido.
-const CUSTOMER_KEY = 'revendaja.customer';
-
-type SavedCustomer = {
-  name: string;
-  whatsapp: string;
-  fulfillment: FulfillmentMethod;
-  address: string;
-  paymentMethod: NewSalePaymentMethod;
-};
-
-function readSavedCustomer(): SavedCustomer | null {
-  try {
-    const raw = window.localStorage.getItem(CUSTOMER_KEY);
-    if (!raw) return null;
-    const data = JSON.parse(raw) as Partial<SavedCustomer>;
-    if (typeof data.name !== 'string' || typeof data.whatsapp !== 'string') return null;
-    return {
-      name: data.name,
-      whatsapp: data.whatsapp,
-      fulfillment: data.fulfillment === 'delivery' ? 'delivery' : 'pickup',
-      address: typeof data.address === 'string' ? data.address : '',
-      paymentMethod: data.paymentMethod === 'card' || data.paymentMethod === 'cash' ? data.paymentMethod : 'pix',
-    };
-  } catch {
-    return null;
-  }
-}
-
-function writeSavedCustomer(customer: SavedCustomer | null) {
-  try {
-    if (customer) window.localStorage.setItem(CUSTOMER_KEY, JSON.stringify(customer));
-    else window.localStorage.removeItem(CUSTOMER_KEY);
-  } catch {
-    // localStorage indisponível (modo privado, cota cheia): o pedido segue normal, só não lembra dos dados.
-  }
-}
 
 export function StorefrontView({ initial, home }: { initial: Storefront; home: StorefrontHome }) {
   const { store, config } = home;
@@ -113,6 +82,20 @@ export function StorefrontView({ initial, home }: { initial: Storefront; home: S
   const [cart, setCart] = useState<CartLine[]>([]);
   const [cartOpen, setCartOpen] = useState(false);
   const [receipt, setReceipt] = useState<OnlineOrderReceipt | null>(null);
+
+  // Quem já comprou neste aparelho e o CEP informado. Lê só depois de montar para o HTML do servidor
+  // e o do cliente baterem (no servidor é sempre "Visitante").
+  const [customerName, setCustomerName] = useState<string | null>(null);
+  const [cep, setCep] = useState<VisitorCep | null>(null);
+  useEffect(() => {
+    setCustomerName(readSavedCustomer()?.name ?? null);
+    setCep(readSavedCep());
+  }, []);
+
+  function changeCep(next: VisitorCep | null) {
+    setCep(next);
+    writeSavedCep(next);
+  }
 
   // Uma visita por sessão do navegador (não por recarregamento).
   useEffect(() => {
@@ -229,15 +212,12 @@ export function StorefrontView({ initial, home }: { initial: Storefront; home: S
     ? home.categories.find((category) => category.type === filter.type && category.id === filter.id)?.name ?? null
     : null;
 
+  // As categorias ficam no cabeçalho; aqui só os atalhos de seções que existem nesta loja.
   const navSections: NavSection[] = [
-    { id: SECTION_IDS.top, label: 'Início' },
-    ...(hasCategories ? [{ id: SECTION_IDS.categories, label: 'Categorias' }] : []),
     ...(hasOffers ? [{ id: SECTION_IDS.offers, label: 'Ofertas' }] : []),
     ...(hasNew ? [{ id: SECTION_IDS.newArrivals, label: 'Novidades' }] : []),
-    ...(hasAnyProduct ? [{ id: SECTION_IDS.catalog, label: 'Todos os produtos' }] : []),
   ];
 
-  const heroImages = pickImages([...home.featured, ...home.newArrivals, ...home.offers.products], 4);
   const flashImages = pickImages(home.offers.products, 3);
 
   const existingSections = new Set<string>([
@@ -247,18 +227,21 @@ export function StorefrontView({ initial, home }: { initial: Storefront; home: S
     ...(hasNew ? [SECTION_IDS.newArrivals] : []),
   ]);
 
+  // Destino de um link (banner ou coleção): filtra por categoria/marca ou rola até a seção. Seção
+  // que não existe nesta loja (sem ofertas, sem novidades...) leva ao catálogo.
+  function openLink(link: CollectionLink) {
+    const target = resolveLink(link);
+    if (target.kind === 'filter') return applyFilter(target.filter);
+    scrollToSection(existingSections.has(target.id) ? target.id : SECTION_IDS.catalog);
+  }
+
   const collections: CollectionView[] = config.collections.map((collection) => {
-    const target = resolveLink(collection.link);
     const linkImage = collectionLinkImage(collection.link, home.categories);
     const images = linkImage ? [linkImage] : pickImages(collectionProducts(collection.link, home), 3);
     return {
       collection,
       images,
-      onOpen: () => {
-        if (target.kind === 'filter') return applyFilter(target.filter);
-        // Seção que não existe nesta loja (sem ofertas, sem novidades...): leva ao catálogo.
-        scrollToSection(existingSections.has(target.id) ? target.id : SECTION_IDS.catalog);
-      },
+      onOpen: () => openLink(collection.link),
     };
   });
 
@@ -266,6 +249,7 @@ export function StorefrontView({ initial, home }: { initial: Storefront; home: S
     <div className="min-h-screen bg-ink-50 pb-24 sm:pb-0">
       <StorefrontHeader
         storeName={store.storeName}
+        logo={store.logo}
         announcement={config.announcement}
         acceptedPaymentMethods={store.acceptedPaymentMethods}
         sections={navSections}
@@ -273,17 +257,20 @@ export function StorefrontView({ initial, home }: { initial: Storefront; home: S
         onQueryChange={changeQuery}
         cartCount={cartCount}
         onOpenCart={() => setCartOpen(true)}
+        categories={home.categories}
+        activeFilter={filter}
+        onSelectCategory={applyFilter}
+        onClearCategory={() => applyFilter(null)}
+        customerName={customerName}
+        cep={cep}
+        onCepChange={changeCep}
       />
 
       <main id={SECTION_IDS.top} className="mx-auto flex max-w-6xl scroll-mt-28 flex-col gap-10 px-4 pt-5">
-        <HeroBanner
-          hero={config.hero}
-          images={heroImages}
-          maxDiscount={discount}
-          productCount={initial.products.total}
-          hasOffers={hasOffers}
-          onPrimary={() => scrollToSection(hasAnyProduct ? SECTION_IDS.catalog : SECTION_IDS.top)}
-          onSecondary={() => scrollToSection(SECTION_IDS.offers)}
+        <BannerCarousel
+          banners={config.banners}
+          storeName={store.storeName}
+          onOpen={(banner) => banner.link && openLink(banner.link)}
         />
 
         <BenefitsStrip benefits={config.benefits} />
@@ -425,9 +412,11 @@ export function StorefrontView({ initial, home }: { initial: Storefront; home: S
           acceptedPaymentMethods={store.acceptedPaymentMethods}
           cart={cart}
           cartTotal={cartTotal}
+          cep={cep}
           onChangeQuantity={changeQuantity}
           onClose={() => setCartOpen(false)}
           onOrdered={(order) => {
+            setCustomerName(readSavedCustomer()?.name ?? order.customerName);
             setCart([]);
             setReceipt(order);
           }}
@@ -445,6 +434,7 @@ function CartPanel({
   acceptedPaymentMethods,
   cart,
   cartTotal,
+  cep,
   onChangeQuantity,
   onClose,
   onOrdered,
@@ -454,6 +444,7 @@ function CartPanel({
   acceptedPaymentMethods: NewSalePaymentMethod[];
   cart: CartLine[];
   cartTotal: number;
+  cep: VisitorCep | null;
   onChangeQuantity: (productId: string, delta: number) => void;
   onClose: () => void;
   onOrdered: (order: OnlineOrderReceipt) => void;
@@ -471,7 +462,8 @@ function CartPanel({
   const [name, setName] = useState(saved?.name ?? '');
   const [whatsapp, setWhatsapp] = useState(saved?.whatsapp ?? '');
   const [fulfillment, setFulfillment] = useState<FulfillmentMethod>(saved?.fulfillment ?? 'pickup');
-  const [address, setAddress] = useState(saved?.address ?? '');
+  // Sem endereço salvo, parte do CEP informado no cabeçalho (o cliente completa com número e complemento).
+  const [address, setAddress] = useState(saved?.address || (cep ? addressFromCep(cep) : ''));
   const [paymentMethod, setPaymentMethod] = useState<NewSalePaymentMethod>(savedPayment ?? methods[0]?.method ?? 'pix');
   const [installments, setInstallments] = useState(1);
   // Entrega paga em dinheiro: o cliente diz se precisa de troco e para quanto.

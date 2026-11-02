@@ -3,7 +3,7 @@ import type { ZodTypeProvider } from '@fastify/type-provider-zod';
 import { authenticate } from '../../shared/middlewares/authenticate';
 import { requireVerified } from '../../shared/middlewares/requireVerified';
 import { uploadImageResponseSchema } from './uploads.schema';
-import { uploadProductImage, uploadStoreBanner } from './uploads.controller';
+import { uploadProductImage, uploadStoreBanner, uploadStoreLogo } from './uploads.controller';
 
 export async function uploadsRoutes(app: FastifyInstance): Promise<void> {
   const server = app.withTypeProvider<ZodTypeProvider>();
@@ -36,5 +36,20 @@ export async function uploadsRoutes(app: FastifyInstance): Promise<void> {
       },
     },
     uploadStoreBanner,
+  );
+
+  server.post(
+    '/uploads/store-logo',
+    {
+      preHandler: [authenticate, requireVerified('Confirme seu e-mail antes de enviar imagens.')],
+      schema: {
+        tags: ['uploads'],
+        summary:
+          'Envia a logo da loja (multipart/form-data, campo "image") pro S3 e devolve a URL pública.',
+        security: [{ bearerAuth: [] }],
+        response: { 200: uploadImageResponseSchema },
+      },
+    },
+    uploadStoreLogo,
   );
 }

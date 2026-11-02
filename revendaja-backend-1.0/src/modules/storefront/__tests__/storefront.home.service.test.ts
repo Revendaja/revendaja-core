@@ -16,6 +16,7 @@ function buildStore(overrides: Partial<Store> = {}): Store {
     catalogLink: 'https://lealperfumaria.revendaja.com',
     isOnline: true,
     bio: null,
+    logo: null,
     plan: 'free',
     defaultMinStock: 0,
     createdAt: new Date(),
@@ -262,6 +263,7 @@ describe('StorefrontService#getHome', () => {
       'bio',
       'handle',
       'hideBranding',
+      'logo',
       'storeName',
     ]);
   });
@@ -299,6 +301,7 @@ describe('StorefrontService#getCustomization / updateCustomization', () => {
     expect(result.defaults).toEqual(buildDefaultConfig('Leal Perfumaria'));
     expect(result.customized).toEqual({
       announcement: false,
+      banners: false,
       hero: true,
       benefits: false,
       flash: false,

@@ -28,6 +28,11 @@ export const DEFAULT_CONFIG: StorefrontConfig = {
     text: 'Bem-vinda à Leal Perfumaria! Escolha seus produtos e faça o pedido pelo site.',
     rightText: null,
   },
+  banners: [
+    { imageUrl: 'https://img.test/banner-1.jpg', link: { type: 'section', section: 'offers' } },
+    { imageUrl: 'https://img.test/banner-2.jpg', link: { type: 'section', section: 'new' } },
+    { imageUrl: 'https://img.test/banner-3.jpg', link: null },
+  ],
   hero: {
     badge: 'NOVIDADES DA LOJA',
     title: 'Beleza e cuidado',
@@ -73,6 +78,7 @@ export function homeData(overrides: Partial<StorefrontHome> = {}): StorefrontHom
       storeName: 'Leal Perfumaria',
       handle: 'lealperfumaria',
       bio: 'Cosméticos com entrega rápida.',
+      logo: null,
       acceptedPaymentMethods: ['pix', 'card', 'cash'],
       hideBranding: false,
     },
@@ -93,7 +99,7 @@ export function homeData(overrides: Partial<StorefrontHome> = {}): StorefrontHom
 
 export function listPage(items = many('p', 3), total = items.length) {
   return {
-    store: { storeName: 'Leal Perfumaria', handle: 'lealperfumaria', bio: null, acceptedPaymentMethods: ['pix' as const, 'card' as const, 'cash' as const] },
+    store: { storeName: 'Leal Perfumaria', handle: 'lealperfumaria', bio: null, logo: null, acceptedPaymentMethods: ['pix' as const, 'card' as const, 'cash' as const] },
     products: { items, page: 1, pageSize: 24, total },
   };
 }
