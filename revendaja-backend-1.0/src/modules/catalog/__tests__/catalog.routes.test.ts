@@ -20,10 +20,12 @@ jest.mock('../../../database/prisma', () => ({
       count: (...args: unknown[]) => productCount(...args),
       findUnique: (...args: unknown[]) => productFindUnique(...args),
     },
-    $queryRaw: (...args: unknown[]) => queryRaw(...args),
+    $queryRaw: async (...args: unknown[]) =>
+      sessionHelpers.sessionAwareQueryRaw(sessionFindUnique, undefined, queryRaw, args),
   },
 }));
 
+import * as sessionHelpers from '../../../../test/helpers/session';
 import { buildApp } from '../../../app';
 
 const USER_ID = '3fa85f64-5717-4562-b3fc-2c963f66afa6';

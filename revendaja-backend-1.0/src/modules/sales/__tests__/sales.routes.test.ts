@@ -25,6 +25,8 @@ const txSaleItemFindMany = jest.fn();
 
 jest.mock('../../../database/prisma', () => ({
   prisma: {
+    $queryRaw: async (...args: unknown[]) =>
+      sessionHelpers.emulateSessionJoin(sessionFindUnique, userFindUnique, args),
     session: { findUnique: (...args: unknown[]) => sessionFindUnique(...args) },
     user: { findUnique: (...args: unknown[]) => userFindUnique(...args) },
     store: { findUnique: (...args: unknown[]) => storeFindUnique(...args) },
@@ -42,6 +44,7 @@ jest.mock('../../../database/prisma', () => ({
   },
 }));
 
+import * as sessionHelpers from '../../../../test/helpers/session';
 import { buildApp } from '../../../app';
 
 const USER_ID = '3fa85f64-5717-4562-b3fc-2c963f66afa6';

@@ -34,6 +34,10 @@ export const queryKeys = {
     brands: () => ['catalog', 'brands'] as const,
   },
 
+  ai: {
+    usage: () => ['ai', 'usage'] as const,
+  },
+
   notifications: {
     // Prefixo sozinho invalida a lista E a contagem de não lidas juntas (ex.: depois de marcar como lida).
     all: () => ['notifications'] as const,

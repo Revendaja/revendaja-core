@@ -176,15 +176,25 @@ export default function HomeScreen({ navigation }: Props) {
               )}
             </View>
           </View>
-          <Pressable
-            className="w-10 h-10 rounded-full bg-white items-center justify-center"
-            onPress={() => navigation.navigate('Notifications')}
-            accessibilityRole="button"
-            accessibilityLabel="Notificações"
-          >
-            <Ionicons name="notifications-outline" size={20} color="#1A1B25" />
-            {alerts.length > 0 && <View className="absolute top-2 right-2 w-2 h-2 rounded-full bg-primary-500" />}
-          </Pressable>
+          <View className="flex-row items-center gap-2">
+            <Pressable
+              className="w-10 h-10 rounded-full bg-white items-center justify-center"
+              onPress={() => navigation.navigate('Assistant')}
+              accessibilityRole="button"
+              accessibilityLabel="Assistente de IA"
+            >
+              <Ionicons name="sparkles" size={18} color="#FF6B00" />
+            </Pressable>
+            <Pressable
+              className="w-10 h-10 rounded-full bg-white items-center justify-center"
+              onPress={() => navigation.navigate('Notifications')}
+              accessibilityRole="button"
+              accessibilityLabel="Notificações"
+            >
+              <Ionicons name="notifications-outline" size={20} color="#1A1B25" />
+              {alerts.length > 0 && <View className="absolute top-2 right-2 w-2 h-2 rounded-full bg-primary-500" />}
+            </Pressable>
+          </View>
         </View>
 
         {status === 'loading' && <HomeSkeleton />}

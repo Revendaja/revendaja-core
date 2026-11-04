@@ -52,7 +52,13 @@
       ],
       "@react-native-google-signin/google-signin",
       "expo-status-bar",
-      "expo-font"
+      "expo-font",
+      [
+        "expo-audio",
+        {
+          "microphonePermission": "O RevendaJá usa o microfone para você conversar com o assistente por voz."
+        }
+      ]
     ],
     "extra": {
       "eas": {

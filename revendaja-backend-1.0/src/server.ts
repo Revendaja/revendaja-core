@@ -1,5 +1,6 @@
 import { buildApp } from './app';
 import { env } from './config/env';
+import { apiDocsEnabled } from './config/security';
 import { connectDatabase, disconnectDatabase } from './database/prisma';
 import { notificationsProcessor } from './modules/notifications/notifications.worker';
 import { startOnlineOrderExpiration } from './modules/sales/sales.expiration';
@@ -16,7 +17,9 @@ async function start(): Promise<void> {
   try {
     await connectDatabase();
     await app.listen({ port: env.PORT, host: env.HOST });
-    logger.info(`Servidor rodando em http://${env.HOST}:${env.PORT} (docs em /docs)`);
+    logger.info(
+      `Servidor rodando em http://${env.HOST}:${env.PORT}${apiDocsEnabled(env.NODE_ENV, env.API_DOCS_ENABLED) ? ' (docs em /docs)' : ''}`,
+    );
   } catch (error) {
     logger.error(error, 'Falha ao iniciar o servidor');
     process.exit(1);

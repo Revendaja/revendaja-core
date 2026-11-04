@@ -14,6 +14,8 @@ const pushTokenDeleteMany = jest.fn();
 
 jest.mock('../../../database/prisma', () => ({
   prisma: {
+    $queryRaw: async (...args: unknown[]) =>
+      sessionHelpers.emulateSessionJoin(sessionFindUnique, userFindUnique, args),
     session: {
       findUnique: (...args: unknown[]) => sessionFindUnique(...args),
     },
@@ -36,6 +38,7 @@ jest.mock('../../../database/prisma', () => ({
   },
 }));
 
+import * as sessionHelpers from '../../../../test/helpers/session';
 import { buildApp } from '../../../app';
 import { notificationsQueue } from '../../../shared/queue/queues';
 

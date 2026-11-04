@@ -4,6 +4,7 @@ import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { useAuth } from '@/lib/auth/AuthContext';
 import { useUnreadNotifications } from '@/hooks/useUnreadNotifications';
+import { useIsAdmin } from '@/lib/admin/hooks';
 import { Icon, type IconName } from './icons';
 
 type NavItem = { label: string; href: string; icon: IconName };
@@ -59,6 +60,11 @@ export function Sidebar({
   const pathname = usePathname();
   const { store } = useAuth();
   const unread = useUnreadNotifications();
+  const { isAdmin } = useIsAdmin();
+  // Só contas com papel de administradora veem o acesso à área de administração.
+  const groups: NavGroup[] = isAdmin
+    ? [...GROUPS, { title: 'Empresa', items: [{ label: 'Administração', href: '/admin', icon: 'lock' }] }]
+    : GROUPS;
 
   return (
     <>
@@ -91,7 +97,7 @@ export function Sidebar({
         </div>
 
         <nav className="flex flex-col">
-          {GROUPS.map((group) => (
+          {groups.map((group) => (
             <div key={group.title} className="flex flex-col border-t border-ink-200/70 pb-2 pt-3">
               <p
                 className={`flex h-7 items-center px-3 text-xs text-ink-400 transition-opacity ${

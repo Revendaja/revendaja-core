@@ -30,11 +30,14 @@ export async function authenticate(request: FastifyRequest, _reply: FastifyReply
   // Um novo login (em outro aparelho), o logout ou a redefinição de senha
   // apagam/trocam a sessão, e os tokens antigos passam a ser recusados aqui.
   // Tokens emitidos antes de existir sessão (sem `sid`) também caem aqui.
-  const session = payload.sid ? await sessionsRepository.findById(payload.sid) : null;
+  const session = payload.sid ? await sessionsRepository.findByIdWithUser(payload.sid) : null;
   if (!isSessionActive(session, payload.sub)) {
     throw new UnauthorizedError('Sessão encerrada. Faça login novamente.');
   }
 
   request.userId = payload.sub;
   request.sessionId = session.id;
+  // Já veio na mesma consulta da sessão: `requireVerified` e `requireAdmin` não precisam ir ao banco.
+  // (Pode faltar em quem monta a sessão sem a usuária; eles têm o caminho de reserva.)
+  request.authUser = session.user ?? undefined;
 }

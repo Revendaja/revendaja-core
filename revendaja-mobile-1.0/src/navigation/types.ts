@@ -63,4 +63,6 @@ export type RootStackParamList = {
   // Fora das abas de propósito: abre "por cima" de tudo (inclusive da navbar) e não fica "presa"
   // numa aba — trocar de aba e voltar pra Início não deve reabrir Notificações sozinha.
   Notifications: undefined;
+  // Assistente de IA (chat). Fora das abas, pelo mesmo motivo de Notificações.
+  Assistant: undefined;
 };

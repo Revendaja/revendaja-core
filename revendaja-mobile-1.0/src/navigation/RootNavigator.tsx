@@ -17,6 +17,7 @@ import SplashScreen from '../screens/auth/SplashScreen';
 import ConnectionErrorScreen from '../screens/auth/ConnectionErrorScreen';
 import HomeScreen from '../screens/app/HomeScreen';
 import NotificationsScreen from '../screens/app/NotificationsScreen';
+import AssistantScreen from '../screens/app/AssistantScreen';
 import CatalogScreen from '../screens/app/CatalogScreen';
 import ProductDetailScreen from '../screens/app/ProductDetailScreen';
 import NewProductScreen from '../screens/app/NewProductScreen';
@@ -328,6 +329,7 @@ export default function RootNavigator() {
           {/* Fora das abas de propósito: abre por cima da navbar e não fica presa numa aba (ver
           navigation/types.ts). */}
           <RootStackNav.Screen name="Notifications" component={NotificationsScreen} />
+          <RootStackNav.Screen name="Assistant" component={AssistantScreen} />
         </>
       )}
     </RootStackNav.Navigator>

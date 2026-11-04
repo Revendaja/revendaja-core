@@ -1,4 +1,4 @@
-const BASE_URL = 'https://revendaja-catalogo.s3.us-east-2.amazonaws.com/estoqueproprio/brands';
+const BASE_URL = 'https://revendaja-dev.s3.sa-east-1.amazonaws.com/estoqueproprio/brands';
 
 // Marcas do catálogo do sistema (prisma/seed/brands.json); color = cor principal, usada na borda.
 const BRANDS = [

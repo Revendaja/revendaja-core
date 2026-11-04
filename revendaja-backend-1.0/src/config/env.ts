@@ -144,6 +144,42 @@ const envSchema = z
     // URL do painel web, para onde a Stripe devolve a usuária depois do pagamento/portal.
     WEB_APP_URL: z.string().url().default('http://localhost:3001'),
 
+    // Sites (navegador) autorizados a chamar a API, além do painel (WEB_APP_URL), do domínio e das
+    // vitrines ({handle}.STORE_BASE_DOMAIN), que já são aceitos. Lista separada por vírgula.
+    CORS_ORIGINS: z
+      .string()
+      .optional()
+      .transform((value) =>
+        (value ?? '')
+          .split(',')
+          .map((item) => item.trim())
+          .filter(Boolean),
+      ),
+    // Documentação interativa (/docs). Ausente: ligada fora de produção e desligada em produção.
+    API_DOCS_ENABLED: z.enum(['true', 'false']).optional(),
+
+    // Assistente de IA (módulo `ai`, OpenAI). Sem OPENAI_API_KEY as rotas /ai respondem 503; o
+    // resto da API sobe normalmente.
+    OPENAI_API_KEY: z
+      .string()
+      .trim()
+      .optional()
+      .transform((value) => value || undefined),
+    AI_MODEL: z.string().trim().min(1).default('gpt-6-luna'),
+    // Modelo que transforma o áudio da mensagem por voz em texto.
+    AI_TRANSCRIBE_MODEL: z.string().trim().min(1).default('gpt-transcribe'),
+    // Esforço de raciocínio do modelo. `none` (padrão) é o mais rápido e barato; níveis maiores
+    // gastam mais tokens por resposta.
+    AI_REASONING_EFFORT: z
+      .enum(['none', 'minimal', 'low', 'medium', 'high', 'xhigh', 'max'])
+      .default('none'),
+    // Teto de rodadas modelo -> ferramenta -> modelo em UMA mensagem da usuária.
+    AI_MAX_TOOL_ITERATIONS: z.coerce.number().int().min(1).max(12).default(6),
+    // Quantas mensagens da usuária (turnos) anteriores voltam para o modelo como contexto.
+    AI_HISTORY_TURNS: z.coerce.number().int().min(1).max(50).default(12),
+    // Minutos até uma operação proposta pela IA (aguardando confirmação) expirar.
+    AI_ACTION_TTL_MINUTES: z.coerce.number().int().min(1).max(1440).default(15),
+
     // Intervalos dos jobs recorrentes de notificação (BullMQ). Ver docs/ARCHITECTURE.md.
     NOTIFICATION_STOCK_CHECK_INTERVAL_MINUTES: z.coerce.number().int().positive().default(60),
     NOTIFICATION_GOAL_CHECK_INTERVAL_MINUTES: z.coerce.number().int().positive().default(360),

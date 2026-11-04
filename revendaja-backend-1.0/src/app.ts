@@ -13,6 +13,8 @@ import {
   type ZodTypeProvider,
 } from '@fastify/type-provider-zod';
 import { env } from './config/env';
+import { apiDocsEnabled, buildOriginMatcher } from './config/security';
+import { UNMATCHED_ROUTE, latencyTracker } from './shared/metrics/latency';
 import { pinoOptions } from './shared/logger';
 import { TooManyRequestsError } from './shared/errors/AppError';
 import { errorHandler } from './shared/errors/errorHandler';
@@ -28,11 +30,20 @@ import { storefrontRoutes } from './modules/storefront/storefront.routes';
 import { uploadsRoutes } from './modules/uploads/uploads.routes';
 import { notificationRoutes } from './modules/notifications/notifications.routes';
 import { billingRoutes } from './modules/billing/billing.routes';
+import { aiRoutes } from './modules/ai/ai.routes';
+import { adminRoutes } from './modules/admin/admin.routes';
 import { MAX_IMAGE_BYTES } from './shared/s3';
 
 // Sem anotação explícita de retorno: o tipo real do Fastify aqui carrega o
 // ZodTypeProvider (usado pelas rotas), então deixamos o TypeScript inferi-lo
 // em vez de forçar o tipo genérico `FastifyInstance` padrão.
+const isOriginAllowed = buildOriginMatcher({
+  nodeEnv: env.NODE_ENV,
+  storeBaseDomain: env.STORE_BASE_DOMAIN,
+  webAppUrl: env.WEB_APP_URL,
+  extraOrigins: env.CORS_ORIGINS,
+});
+
 export async function buildApp() {
   const app = Fastify({
     logger: pinoOptions,
@@ -43,11 +54,32 @@ export async function buildApp() {
   app.setSerializerCompiler(serializerCompiler);
   app.setErrorHandler(errorHandler);
 
+  // Mede o tempo de resposta de cada rota (ver shared/metrics/latency.ts e a página Desempenho do
+  // painel). Usa o MODELO da rota ("/sales/:id"), não a URL real, para não criar uma entrada por id.
+  app.addHook('onResponse', (request, reply, done) => {
+    const route = request.routeOptions.url;
+    // Fora da conta: pré-voo do CORS e as rotas do próprio painel (que ele consulta de tempos em tempos).
+    if (request.method !== 'OPTIONS' && !route?.startsWith('/admin')) {
+      latencyTracker.record(
+        request.method,
+        route ?? UNMATCHED_ROUTE,
+        reply.elapsedTime,
+        reply.statusCode,
+      );
+    }
+    done();
+  });
+
   await app.register(helmet);
   // O padrão do @fastify/cors só libera GET/HEAD/POST: sem listar PUT/PATCH/DELETE
   // o preflight de um navegador falha nas rotas de edição/remoção. Origem `*`
   // é aceitável porque a API autentica por header Bearer (não por cookie).
-  await app.register(cors, { methods: ['GET', 'HEAD', 'POST', 'PUT', 'PATCH', 'DELETE'] });
+  await app.register(cors, {
+    methods: ['GET', 'HEAD', 'POST', 'PUT', 'PATCH', 'DELETE'],
+    // Só os sites da Revendaja (painel, domínio e vitrines) leem as respostas pelo navegador; ver
+    // config/security.ts. O app do celular não depende disto.
+    origin: (origin, callback) => callback(null, isOriginAllowed(origin)),
+  });
   await app.register(sensible);
   // Upload da imagem de um produto manual (multipart/form-data). O limite bate com
   // `MAX_IMAGE_BYTES`, que o controller usa pra devolver uma mensagem de erro amigável.
@@ -75,11 +107,10 @@ export async function buildApp() {
     },
     transform: jsonSchemaTransform,
   });
-  // O Swagger UI (interface HTML em /docs) só é registrado fora do ambiente
-  // de testes: alguns pacotes que ele carrega internamente são ESM-only e
-  // conflitam com o CommonJS usado pelo Jest — e nenhum teste precisa da UI,
-  // só das rotas da API.
-  if (env.NODE_ENV !== 'test') {
+  // O Swagger UI (interface HTML em /docs, com a lista de todas as rotas) fica de fora do ambiente de
+  // testes (alguns pacotes dele são ESM-only e conflitam com o CommonJS do Jest) e, em produção,
+  // desligado: só liga com API_DOCS_ENABLED=true (ver config/security.ts).
+  if (apiDocsEnabled(env.NODE_ENV, env.API_DOCS_ENABLED)) {
     await app.register(swaggerUI, { routePrefix: '/docs' });
   }
 
@@ -95,6 +126,8 @@ export async function buildApp() {
   await app.register(uploadsRoutes);
   await app.register(notificationRoutes);
   await app.register(billingRoutes);
+  await app.register(aiRoutes);
+  await app.register(adminRoutes);
 
   return app;
 }

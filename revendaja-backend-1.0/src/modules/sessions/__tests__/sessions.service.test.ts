@@ -7,6 +7,7 @@ import { UnauthorizedError } from '../../../shared/errors/AppError';
 function createSessionsRepositoryMock(): jest.Mocked<SessionsRepository> {
   return {
     findById: jest.fn(),
+    findByIdWithUser: jest.fn(),
     replaceForUser: jest.fn(),
     deleteById: jest.fn(),
     deleteByUserId: jest.fn(),

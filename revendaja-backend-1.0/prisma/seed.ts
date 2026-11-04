@@ -1,11 +1,23 @@
 import brands from './seed/brands.json';
 import products from './seed/products.json';
+import { env } from '../src/config/env';
 import { prisma } from '../src/database/prisma';
 
 const BATCH_SIZE = 1000;
 
+// Os arquivos de seed foram gerados com as URLs do bucket antigo (revendaja-catalogo, nos EUA).
+// Ao semear, esse endereço é trocado pelo bucket configurado (S3_PUBLIC_BASE_URL): assim o catálogo
+// sempre aponta para o bucket do ambiente, sem depender do antigo.
+const LEGACY_IMAGE_BASE = 'https://revendaja-catalogo.s3.us-east-2.amazonaws.com';
+
+function withImageBase<T extends string | null | undefined>(url: T): T | string {
+  if (!url || !env.S3_PUBLIC_BASE_URL || !url.startsWith(LEGACY_IMAGE_BASE)) return url;
+  return `${env.S3_PUBLIC_BASE_URL}${url.slice(LEGACY_IMAGE_BASE.length)}`;
+}
+
 async function seedBrands(): Promise<void> {
-  for (const brand of brands) {
+  for (const original of brands) {
+    const brand = { ...original, logo: withImageBase(original.logo) };
     await prisma.brand.upsert({
       where: { id: brand.id },
       update: brand,
@@ -20,9 +32,12 @@ async function seedProducts(): Promise<void> {
     // ~5 mil produtos do dump vêm com `basePrice: null`, mas a coluna é NOT NULL.
     // O próprio dump já usa 0 para "sem preço sugerido" (e cada loja define o
     // preço dela ao importar o produto), então null vira 0 em vez de ficar de fora.
-    const batch = products
-      .slice(offset, offset + BATCH_SIZE)
-      .map((product) => ({ ...product, basePrice: product.basePrice ?? 0 }));
+    const batch = products.slice(offset, offset + BATCH_SIZE).map((product) => ({
+      ...product,
+      basePrice: product.basePrice ?? 0,
+      productImage: withImageBase(product.productImage),
+      productImageSm: withImageBase(product.productImageSm),
+    }));
     await prisma.product.createMany({ data: batch, skipDuplicates: true });
     console.warn(`Produtos: ${Math.min(offset + BATCH_SIZE, products.length)}/${products.length}`);
   }

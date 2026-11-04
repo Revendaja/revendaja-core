@@ -152,6 +152,9 @@ model Store {
   sales             Sale[]
   visits            StoreVisit[]
   goalNotifications StoreGoalNotification[]
+  aiConversations   AiConversation[]
+  aiActions         AiAction[]
+  aiUsage           AiUsage[]
 
   @@map("stores")
 }
@@ -500,4 +503,91 @@ model StripeWebhookEvent {
   processedAt DateTime @default(now()) @map("processed_at")
 
   @@map("stripe_webhook_events")
+}
+
+// --- Assistente de IA ---------------------------------------------------------
+
+/// Conversa da consultora com o assistente. Sempre pertence a UMA loja: toda leitura filtra por
+/// `storeId` (o isolamento entre consultoras).
+model AiConversation {
+  id        String   @id @default(uuid())
+  storeId   String   @map("store_id")
+  title     String?
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  store    Store       @relation(fields: [storeId], references: [id], onDelete: Cascade)
+  messages AiMessage[]
+  actions  AiAction[]
+
+  @@index([storeId, updatedAt])
+  @@map("ai_conversations")
+}
+
+/// Uma mensagem do histórico (`role`: user | assistant | tool). `content` guarda os itens no formato
+/// da Responses API da OpenAI (texto, function_call e function_call_output), para o modelo reler a
+/// conversa com fidelidade. Itens de raciocínio não são guardados. `turnStart = true` marca a
+/// mensagem da usuária que abre um turno: o histórico enviado ao modelo é cortado sempre numa
+/// dessas, nunca no meio de um par function_call/function_call_output.
+model AiMessage {
+  id             String   @id @default(uuid())
+  conversationId String   @map("conversation_id")
+  role           String
+  content        Json
+  turnStart      Boolean  @default(false) @map("turn_start")
+  createdAt      DateTime @default(now()) @map("created_at")
+
+  conversation AiConversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+
+  @@index([conversationId, createdAt])
+  @@map("ai_messages")
+}
+
+/// Operação que altera dados, proposta pela IA e executada só depois da confirmação da usuária. É
+/// também a trilha de auditoria: guarda quem (loja), o quê (`tool` + `payload`), quando e o
+/// resultado. O modelo nunca escreve no banco: quem executa é o backend, pelos services existentes.
+/// `status`: pending -> executing -> executed | failed; ou pending -> cancelled | expired.
+model AiAction {
+  id             String    @id @default(uuid())
+  storeId        String    @map("store_id")
+  conversationId String    @map("conversation_id")
+  tool           String
+  payload        Json
+  // Hash de (tool + payload): a mesma proposta repetida na conversa reaproveita a que já está pendente.
+  payloadHash    String    @map("payload_hash")
+  summary        String
+  preview        Json?
+  status         String    @default("pending")
+  result         Json?
+  error          String?
+  expiresAt      DateTime  @map("expires_at")
+  executedAt     DateTime? @map("executed_at")
+  createdAt      DateTime  @default(now()) @map("created_at")
+
+  store        Store          @relation(fields: [storeId], references: [id], onDelete: Cascade)
+  conversation AiConversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+
+  @@index([storeId, createdAt])
+  @@index([conversationId, status, payloadHash])
+  @@map("ai_actions")
+}
+
+/// Consumo do assistente por loja e por mês (`period` = "AAAA-MM", no fuso de Brasília). É o que
+/// aplica o limite do plano (ver `ai.limits.ts`): a mensagem é reservada ANTES de chamar o modelo
+/// com um UPDATE condicional, então duas mensagens simultâneas nunca passam do limite. Os tokens
+/// são só para acompanhar o custo.
+model AiUsage {
+  id             String   @id @default(uuid())
+  storeId        String   @map("store_id")
+  period         String
+  messages       Int      @default(0)
+  transcriptions Int      @default(0)
+  inputTokens    Int      @default(0) @map("input_tokens")
+  outputTokens   Int      @default(0) @map("output_tokens")
+  updatedAt      DateTime @updatedAt @map("updated_at")
+
+  store Store @relation(fields: [storeId], references: [id], onDelete: Cascade)
+
+  @@unique([storeId, period])
+  @@map("ai_usage")
 }

@@ -1,5 +1,10 @@
 # Custo por cliente e proposta de planos
 
+> **Atualização (03/11/2026):** este documento é de set/2026 e não considera o assistente de IA,
+> a mensagem por voz, a cobrança (Stripe) nem a hospedagem real (Fly.io). A versão atual, com
+> custos medidos, margem por plano e melhorias, está em
+> [`RELATORIO_CUSTOS_PLANOS_E_IA.md`](./RELATORIO_CUSTOS_PLANOS_E_IA.md).
+
 > Cotação usada nas conversões: **R$ 5,40 por US$ 1,00** (aproximada, varia — os preços de origem
 > são todos em dólar). Preços consultados nas páginas oficiais de cada serviço em set/2026;
 > confira antes de fechar orçamento, esses valores mudam.
@@ -21,12 +26,12 @@ lojas ativas. Por isso:
 
 ## O que já está confirmado no código (não é estimativa)
 
-| Serviço | Uso no Revendajá | Onde está configurado |
-|---|---|---|
-| **Postgres (Neon)** | Banco principal — lojas, produtos, vendas, categorias | `DATABASE_URL` |
-| **AWS S3** | Foto de produto manual/kit (upload via `/uploads/product-image`, até 5 MB, com validação de tipo real do arquivo) | `AWS_*`, `S3_BUCKET_NAME` em `src/config/env.ts` |
-| **Resend** | E-mail transacional: código de verificação (OTP) e de redefinição de senha | `RESEND_API_KEY`, `MAIL_FROM` |
-| **WhatsApp** | **Custo zero** — o app abre o `Share` nativo do celular (a própria consultora escolhe o WhatsApp na hora); não existe integração paga com a API do WhatsApp Business | `Share.share()` no app |
+| Serviço             | Uso no Revendajá                                                                                                                                                     | Onde está configurado                            |
+| ------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------ |
+| **Postgres (Neon)** | Banco principal — lojas, produtos, vendas, categorias                                                                                                                | `DATABASE_URL`                                   |
+| **AWS S3**          | Foto de produto manual/kit (upload via `/uploads/product-image`, até 5 MB, com validação de tipo real do arquivo)                                                    | `AWS_*`, `S3_BUCKET_NAME` em `src/config/env.ts` |
+| **Resend**          | E-mail transacional: código de verificação (OTP) e de redefinição de senha                                                                                           | `RESEND_API_KEY`, `MAIL_FROM`                    |
+| **WhatsApp**        | **Custo zero** — o app abre o `Share` nativo do celular (a própria consultora escolhe o WhatsApp na hora); não existe integração paga com a API do WhatsApp Business | `Share.share()` no app                           |
 
 O que **não está confirmado** (não achei configuração no repositório) e entra como estimativa:
 onde a API (o servidor Fastify) está hospedada. Uso Render/Railway como referência abaixo por
@@ -84,11 +89,11 @@ Não é um custo por cliente — é fixo e **dividido pelo número de lojas ativ
 Railway (as duas referências mais comuns pra uma API Node pequena, hoje), um serviço leve fica
 entre **US$ 7 e US$ 25/mês** (≈ R$ 38–135) pra tráfego baixo/médio, subindo com o uso.
 
-| Lojas ativas | Custo do servidor (estimado) | Rateio por loja |
-|---|---|---|
-| 50 | R$ 40–70/mês | R$ 0,80–1,40 |
-| 200 | R$ 70–135/mês | R$ 0,35–0,70 |
-| 1.000 | R$ 200–500/mês (precisa subir de plano) | R$ 0,20–0,50 |
+| Lojas ativas | Custo do servidor (estimado)            | Rateio por loja |
+| ------------ | --------------------------------------- | --------------- |
+| 50           | R$ 40–70/mês                            | R$ 0,80–1,40    |
+| 200          | R$ 70–135/mês                           | R$ 0,35–0,70    |
+| 1.000        | R$ 200–500/mês (precisa subir de plano) | R$ 0,20–0,50    |
 
 ### 5. Taxa de cobrança (só planos pagos)
 
@@ -99,13 +104,13 @@ quem paga.
 
 ## Custo total por cliente — panorama
 
-| Item | Loja leve (~30 produtos) | Loja média (~150 produtos) | Loja grande (~1.000 produtos, vitrine com tráfego) |
-|---|---|---|---|
-| Banco (armazenamento) | < R$ 0,01 | < R$ 0,01 | < R$ 0,01 |
-| S3 (fotos + tráfego da vitrine) | < R$ 0,01 | ~R$ 0,05 | ~R$ 0,50–2,50 |
-| E-mail | < R$ 0,01 | < R$ 0,01 | < R$ 0,01 |
-| Servidor (rateado, cenário 200 lojas) | ~R$ 0,50 | ~R$ 0,50 | ~R$ 0,50 |
-| **Total direto/mês** | **~R$ 0,50** | **~R$ 0,55** | **~R$ 1,00–3,00** |
+| Item                                  | Loja leve (~30 produtos) | Loja média (~150 produtos) | Loja grande (~1.000 produtos, vitrine com tráfego) |
+| ------------------------------------- | ------------------------ | -------------------------- | -------------------------------------------------- |
+| Banco (armazenamento)                 | < R$ 0,01                | < R$ 0,01                  | < R$ 0,01                                          |
+| S3 (fotos + tráfego da vitrine)       | < R$ 0,01                | ~R$ 0,05                   | ~R$ 0,50–2,50                                      |
+| E-mail                                | < R$ 0,01                | < R$ 0,01                  | < R$ 0,01                                          |
+| Servidor (rateado, cenário 200 lojas) | ~R$ 0,50                 | ~R$ 0,50                   | ~R$ 0,50                                           |
+| **Total direto/mês**                  | **~R$ 0,50**             | **~R$ 0,55**               | **~R$ 1,00–3,00**                                  |
 
 Ou seja: mesmo a loja "grande" custa menos de R$ 3/mês pra manter no ar. Qualquer plano pago acima
 de R$ 15–20/mês já tem margem bruta acima de 90%.
@@ -175,12 +180,12 @@ hoje o plano só muda direto no banco, não existe checkout nem rota para trocar
 
 ## Resumo de margem
 
-| Plano | Preço | Custo direto/mês | Margem bruta | Observação |
-|---|---|---|---|---|
-| Gratuito | R$ 0 | ~R$ 0,50 (rateado) | — | Custo de aquisição, não de venda |
-| Inicial | R$ 29,99 | ~R$ 0,55 | ~97% | Taxa de gateway (~4% + R$0,40) ainda reduz a margem líquida |
-| Pro | R$ 49,99 | ~R$ 1,50 | ~97% | |
-| Empresarial | R$ 129,99 | ~R$ 3,00 | ~97,5% | Precisa do desenvolvimento citado acima antes de vender |
+| Plano       | Preço     | Custo direto/mês   | Margem bruta | Observação                                                  |
+| ----------- | --------- | ------------------ | ------------ | ----------------------------------------------------------- |
+| Gratuito    | R$ 0      | ~R$ 0,50 (rateado) | —            | Custo de aquisição, não de venda                            |
+| Inicial     | R$ 29,99  | ~R$ 0,55           | ~97%         | Taxa de gateway (~4% + R$0,40) ainda reduz a margem líquida |
+| Pro         | R$ 49,99  | ~R$ 1,50           | ~97%         |                                                             |
+| Empresarial | R$ 129,99 | ~R$ 3,00           | ~97,5%       | Precisa do desenvolvimento citado acima antes de vender     |
 
 ## O que decide se isso é lucrativo (não é o custo por cliente)
 
