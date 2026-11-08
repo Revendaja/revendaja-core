@@ -239,8 +239,13 @@ export default function PrivacyPolicyPage() {
           ]}
         />
         <p>
-          Parte dos dados você mesma(o) altera no app, em Conta e Loja. Para os demais pedidos,
-          inclusive a <strong>exclusão da conta e dos dados</strong>, escreva para{' '}
+          Parte dos dados você mesma(o) altera no app, em Conta e Loja. Você também pode{' '}
+          <strong>excluir a conta e todos os dados</strong> direto no aplicativo, em{' '}
+          <em>Mais → Meus Dados → Excluir minha conta</em>, ou seguir os passos em{' '}
+          <Link className="font-semibold text-primary-600 underline" href="/excluir-conta">
+            revendaja.com/excluir-conta
+          </Link>
+          . Para os demais pedidos, escreva para{' '}
           <a className="font-semibold text-primary-600 underline" href={`mailto:${CONTACT_EMAIL}`}>
             {CONTACT_EMAIL}
           </a>{' '}

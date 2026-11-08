@@ -32,10 +32,36 @@ export default function DeleteAccountPage() {
           {CONTACT_EMAIL}
         </a>{' '}
         from the email address registered in the account, with the subject “{SUBJECT}”. We confirm
-        your identity, answer within 15 days and complete the deletion within 30 days. Details below.
+        your identity, answer within 15 days and complete the deletion within 30 days. You can also
+        delete your account directly in the app: More → My Data (Meus Dados) → “Excluir minha
+        conta”. Details below.
       </p>
 
-      <Section title="Como pedir a exclusão">
+      <Section title="Opção 1: excluir direto no aplicativo (mais rápido)">
+        <List
+          ordered
+          items={[
+            <>
+              Abra o app <strong>RevendaJá</strong> e entre na sua conta.
+            </>,
+            <>
+              Vá em <strong>Mais → Meus Dados</strong> e toque em{' '}
+              <strong>“Excluir minha conta”</strong>.
+            </>,
+            <>
+              Confirme com a sua senha (ou com a conta Google, se você entra pelo Google). A conta e
+              os dados são apagados na hora.
+            </>,
+          ]}
+        />
+        <p>
+          Se você tem uma assinatura ativa, ela é cancelada antes da exclusão, para você não ser
+          cobrada depois.
+        </p>
+      </Section>
+
+      <Section title="Opção 2: pedir a exclusão por e-mail (sem precisar do app)">
+        <p>Use esta opção se você desinstalou o app ou não consegue entrar na conta.</p>
         <List
           ordered
           items={[
