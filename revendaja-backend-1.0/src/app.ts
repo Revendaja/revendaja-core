@@ -19,6 +19,7 @@ import { pinoOptions } from './shared/logger';
 import { TooManyRequestsError } from './shared/errors/AppError';
 import { errorHandler } from './shared/errors/errorHandler';
 import { healthRoutes } from './modules/health/health.routes';
+import { accountRoutes } from './modules/account/account.routes';
 import { authRoutes } from './modules/auth/auth.routes';
 import { otpRoutes } from './modules/otp/otp.routes';
 import { passwordResetRoutes } from './modules/passwordReset/passwordReset.routes';
@@ -116,6 +117,7 @@ export async function buildApp() {
 
   await app.register(healthRoutes);
   await app.register(authRoutes);
+  await app.register(accountRoutes);
   await app.register(otpRoutes);
   await app.register(passwordResetRoutes);
   await app.register(storeRoutes);

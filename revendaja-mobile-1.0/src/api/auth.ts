@@ -53,6 +53,13 @@ export function resetPassword(input: { email: string; code: string; password: st
   return request<{ reset: boolean }>('/auth/reset-password', { method: 'POST', body: input });
 }
 
+// Exclusão definitiva da conta e de tudo que é dela. Quem tem senha confirma com ela; conta só do
+// Google confirma com um ID token novo. Sem renovar em 401: aqui 401 = senha/Google não conferem
+// (o token de acesso já foi renovado antes de enviar, ver getFreshAccessToken).
+export function deleteAccount(input: { password?: string; googleIdToken?: string }) {
+  return request<{ deleted: boolean }>('/me', { method: 'DELETE', body: input, auth: true, renewOn401: false });
+}
+
 export function getMe() {
   return request<MeResponse>('/me', { auth: true });
 }

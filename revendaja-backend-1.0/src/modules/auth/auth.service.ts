@@ -107,7 +107,11 @@ export class AuthService {
       if (existing) {
         // Conta antiga de e-mail/senha com o mesmo e-mail: vincula o Google a ela em vez de
         // criar uma conta duplicada.
-        user = await this.users.linkGoogleId(existing.id, profile.googleId, existing.phoneVerifiedAt === null);
+        user = await this.users.linkGoogleId(
+          existing.id,
+          profile.googleId,
+          existing.phoneVerifiedAt === null,
+        );
       } else {
         const result = await this.users.createFromGoogle({
           name: profile.name,
@@ -153,6 +157,7 @@ export class AuthService {
       user: toPublicUser(user),
       isVerified: user.phoneVerifiedAt !== null,
       store,
+      hasPassword: user.passwordHash !== null,
     };
   }
 

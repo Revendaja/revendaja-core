@@ -37,6 +37,8 @@ export type MeResponse = {
   user: AuthUser;
   isVerified: boolean;
   store: StoreInfo | null;
+  // false = conta criada só pelo Google (sem senha): a exclusão de conta confirma pelo Google.
+  hasPassword: boolean;
 };
 
 export type Brand = {

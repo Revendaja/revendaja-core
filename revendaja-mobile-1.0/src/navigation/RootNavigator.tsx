@@ -35,6 +35,7 @@ import EditStoreScreen from '../screens/app/EditStoreScreen';
 import OnlineSalesScreen from '../screens/app/OnlineSalesScreen';
 import MoreScreen from '../screens/app/MoreScreen';
 import AccountScreen from '../screens/app/AccountScreen';
+import DeleteAccountScreen from '../screens/app/DeleteAccountScreen';
 import PlansScreen from '../screens/app/PlansScreen';
 import SubscriptionScreen from '../screens/app/SubscriptionScreen';
 import { useQueryClient } from '@tanstack/react-query';
@@ -100,6 +101,7 @@ function MoreStack() {
     <MoreStackNav.Navigator screenOptions={{ headerShown: false }}>
       <MoreStackNav.Screen name="MoreHome" component={MoreScreen} />
       <MoreStackNav.Screen name="Account" component={AccountScreen} />
+      <MoreStackNav.Screen name="DeleteAccount" component={DeleteAccountScreen} />
       <MoreStackNav.Screen name="Plans" component={PlansScreen} />
       <MoreStackNav.Screen name="Subscription" component={SubscriptionScreen} />
       <MoreStackNav.Screen name="StoreHome" component={StoreScreen} />

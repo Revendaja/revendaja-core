@@ -62,6 +62,8 @@ export const meResponseSchema = z.object({
   user: userPublicSchema,
   isVerified: z.boolean(),
   store: storeResponseSchema.nullable(),
+  // false = conta criada só pelo Google (sem senha): a exclusão de conta confirma pelo Google.
+  hasPassword: z.boolean(),
 });
 
 export type RegisterInput = z.infer<typeof registerSchema>;

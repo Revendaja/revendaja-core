@@ -527,6 +527,24 @@ describe('AuthService', () => {
 
       expect(result.isVerified).toBe(true);
       expect(result.store).toBeNull();
+      expect(result.hasPassword).toBe(true);
+    });
+
+    it('hasPassword é false para conta criada só pelo Google', async () => {
+      const users = createUsersRepositoryMock();
+      const stores = createStoreRepositoryMock();
+      users.findById.mockResolvedValue(await buildUser({ passwordHash: null, googleId: 'g-1' }));
+      stores.findByUserId.mockResolvedValue(null);
+      const service = new AuthService(
+        users,
+        stores,
+        createOtpServiceMock(),
+        createSessionServiceMock(),
+      );
+
+      const result = await service.getMe('3fa85f64-5717-4562-b3fc-2c963f66afa6');
+
+      expect(result.hasPassword).toBe(false);
     });
   });
 

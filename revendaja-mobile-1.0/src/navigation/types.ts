@@ -31,6 +31,7 @@ export type FinancasStackParamList = {
 export type MoreStackParamList = {
   MoreHome: undefined;
   Account: undefined;
+  DeleteAccount: undefined;
   Plans: undefined;
   Subscription: undefined;
   StoreHome: undefined;

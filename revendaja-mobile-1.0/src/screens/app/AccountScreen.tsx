@@ -150,6 +150,16 @@ export default function AccountScreen({ navigation }: Props) {
         >
           <Text className="text-white font-extrabold text-base">{loading ? 'Salvando...' : 'Salvar Alterações'}</Text>
         </Pressable>
+
+        <Pressable
+          className="items-center justify-center h-12 mt-8"
+          onPress={() => navigation.navigate('DeleteAccount')}
+          disabled={loading}
+          accessibilityRole="button"
+          accessibilityLabel="Excluir minha conta"
+        >
+          <Text className="text-danger font-bold text-sm">Excluir minha conta</Text>
+        </Pressable>
       </ScrollView>
     </SafeAreaView>
   );
