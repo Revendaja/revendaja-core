@@ -1,6 +1,7 @@
 import type { Metadata } from 'next';
 import Link from 'next/link';
-import type { ReactNode } from 'react';
+import { Section, List } from '@/components/legal/blocks';
+import { CONTACT_EMAIL } from '@/lib/legal';
 
 export const metadata: Metadata = {
   title: 'Política de Privacidade | RevendaJá',
@@ -8,28 +9,7 @@ export const metadata: Metadata = {
     'Como o RevendaJá coleta, usa, compartilha e protege os dados de quem usa o aplicativo e a vitrine online.',
 };
 
-// E-mail para pedidos de privacidade (acesso, correção, exclusão de dados).
-const CONTACT_EMAIL = 'contato@revendaja.com';
 const LAST_UPDATE = '8 de novembro de 2026';
-
-function Section({ title, children }: { title: string; children: ReactNode }) {
-  return (
-    <section className="mt-10">
-      <h2 className="text-xl font-bold text-ink-900">{title}</h2>
-      <div className="mt-3 space-y-3 leading-7 text-ink-700">{children}</div>
-    </section>
-  );
-}
-
-function List({ items }: { items: ReactNode[] }) {
-  return (
-    <ul className="list-disc space-y-2 pl-6">
-      {items.map((item, index) => (
-        <li key={index}>{item}</li>
-      ))}
-    </ul>
-  );
-}
 
 export default function PrivacyPolicyPage() {
   return (
