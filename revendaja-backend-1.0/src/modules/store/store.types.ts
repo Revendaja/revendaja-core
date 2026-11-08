@@ -45,7 +45,7 @@ export type CreateStoreResult =
   // INSERT (índice único do banco recusou) — ver StoreRepository#create.
   | { kind: 'already_exists' };
 
-export type StorePlan = 'free' | 'starter' | 'premium' | 'business';
+export type StorePlan = 'free' | 'starter' | 'premium';
 
 // Formas de pagamento que a vitrine pode aceitar. Não inclui fiado (`on_account`), que não existe mais.
 export type AcceptedPaymentMethod = 'pix' | 'card' | 'cash';

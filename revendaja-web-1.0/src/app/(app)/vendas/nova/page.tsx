@@ -4,18 +4,25 @@ import { useMemo, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { createSale } from '@/lib/api/sales';
-import { listStoreProducts } from '@/lib/api/storeProducts';
+import { addStoreProduct, listStoreProducts } from '@/lib/api/storeProducts';
+import { listCatalogProducts } from '@/lib/api/catalog';
 import { queryKeys } from '@/lib/api/queryKeys';
-import { getErrorMessage } from '@/lib/api/errors';
-import type { CreateSaleInput, NewSalePaymentMethod, StoreProduct } from '@/lib/api/types';
-import { formatCurrency } from '@/lib/utils/format';
+import { ApiError, getErrorMessage } from '@/lib/api/errors';
+import type { CatalogProduct, CreateSaleInput, NewSalePaymentMethod, StoreProduct } from '@/lib/api/types';
+import {
+  PRICE_ERROR_MESSAGE,
+  formatCurrency,
+  formatPriceInput,
+  hasSuggestedPrice,
+  parsePriceInput,
+} from '@/lib/utils/format';
 import { createSaleAttemptTracker, isDefinitiveRejection, saleContentKey } from '@/lib/utils/saleAttempt';
 import { PAYMENT_CHIPS, PAYMENT_ICON, roundMoney } from '@/lib/utils/sales';
 import { newRequestId } from '@/lib/utils/uuid';
 import { useDebouncedValue } from '@/hooks/useDebouncedValue';
 import { useSubmitting } from '@/hooks/useSubmitting';
 import { Icon } from '@/components/dashboard/icons';
-import { Banner, Field, PageHeader, TextInput } from '@/components/products/FormParts';
+import { Banner, Field, MoneyField, PageHeader, TextInput } from '@/components/products/FormParts';
 
 type CartLine = { item: StoreProduct; quantity: number };
 
@@ -53,6 +60,56 @@ export default function NewSalePage() {
   const results = term ? (searchQuery.data?.items ?? []) : [];
   const searching = term.length > 0 && searchQuery.isFetching;
   const searchError = searchQuery.isError ? getErrorMessage(searchQuery.error) : null;
+
+  // Sugestão do catálogo: produto que a loja ainda não tem. Só o preço de venda é pedido aqui; a
+  // quantidade se define na tela do produto (estoque), para onde a pessoa é levada em seguida.
+  const catalogQuery = useQuery({
+    queryKey: queryKeys.catalogProducts({ saleSuggest: true, term }),
+    queryFn: () => listCatalogProducts(1, { search: term }),
+    enabled: term.length > 0,
+  });
+  const inStoreCatalogIds = new Set(results.map((item) => item.product.id).filter((id) => id !== null));
+  const catalogSuggestions = term
+    ? (catalogQuery.data?.items ?? []).filter((product) => !inStoreCatalogIds.has(product.id)).slice(0, 3)
+    : [];
+  const [suggested, setSuggested] = useState<CatalogProduct | null>(null);
+  const [suggestedPrice, setSuggestedPrice] = useState('');
+  const [suggestedError, setSuggestedError] = useState<string | null>(null);
+  const [addingSuggested, setAddingSuggested] = useState(false);
+
+  function pickSuggestion(product: CatalogProduct) {
+    setSuggested(product);
+    setSuggestedPrice(hasSuggestedPrice(product.basePrice) ? formatPriceInput(product.basePrice) : '');
+    setSuggestedError(null);
+  }
+
+  async function addSuggestedToStore() {
+    if (!suggested) return;
+    const price = parsePriceInput(suggestedPrice);
+    if (!suggestedPrice.trim() || price === null) {
+      setSuggestedError(suggestedPrice.trim() ? PRICE_ERROR_MESSAGE : 'Informe o seu preço de venda.');
+      return;
+    }
+    setAddingSuggested(true);
+    setSuggestedError(null);
+    try {
+      const created = await addStoreProduct({ productId: suggested.id, price, stock: 0 });
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: queryKeys.allStoreProducts() }),
+        queryClient.invalidateQueries({ queryKey: queryKeys.storePlan() }),
+      ]);
+      router.push(`/produtos/${created.id}`);
+    } catch (error) {
+      if (error instanceof ApiError && error.status === 409) {
+        // Já estava na loja (ex.: cadastrado em outra aba): atualiza a busca e deixa escolher normalmente.
+        void queryClient.invalidateQueries({ queryKey: queryKeys.allStoreProducts() });
+        setSuggested(null);
+      } else {
+        setSuggestedError(getErrorMessage(error));
+      }
+      setAddingSuggested(false);
+    }
+  }
 
   const total = roundMoney(cart.reduce((sum, line) => sum + line.item.price * line.quantity, 0));
   const cartTotalLabel = useMemo(() => formatCurrency(total), [total]);
@@ -296,6 +353,73 @@ export default function NewSalePage() {
                       </button>
                     );
                   })
+                )}
+
+                {!searching && !searchError && catalogSuggestions.length > 0 && (
+                  <div className="border-t border-ink-100 bg-ink-50/50 py-1">
+                    <p className="px-3 pb-1 pt-2 text-[10px] font-bold uppercase text-ink-400">
+                      Está no catálogo, mas não na sua loja
+                    </p>
+                    {catalogSuggestions.map((product) =>
+                      suggested?.id === product.id ? (
+                        <div key={product.id} className="px-3 pb-3 pt-1">
+                          <p className="truncate text-sm font-semibold text-ink-900">{product.name}</p>
+                          <div className="mt-2">
+                            <MoneyField
+                              label="Preço de venda"
+                              value={suggestedPrice}
+                              onChange={(value) => {
+                                setSuggestedPrice(value);
+                                setSuggestedError(null);
+                              }}
+                              error={suggestedError}
+                              disabled={addingSuggested}
+                              hint="Depois você define a quantidade no estoque."
+                            />
+                          </div>
+                          <div className="mt-3 flex gap-2">
+                            <button
+                              type="button"
+                              onClick={() => void addSuggestedToStore()}
+                              disabled={addingSuggested}
+                              className="flex h-10 flex-1 items-center justify-center rounded-xl bg-primary-500 text-xs font-semibold text-white transition hover:bg-primary-600 disabled:opacity-60"
+                            >
+                              {addingSuggested ? 'Adicionando...' : 'Adicionar e ir para o estoque'}
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => setSuggested(null)}
+                              disabled={addingSuggested}
+                              className="h-10 rounded-xl px-3 text-xs font-semibold text-ink-600 hover:bg-ink-100 disabled:opacity-60"
+                            >
+                              Cancelar
+                            </button>
+                          </div>
+                        </div>
+                      ) : (
+                        <button
+                          key={product.id}
+                          type="button"
+                          onClick={() => pickSuggestion(product)}
+                          className="flex w-full items-center gap-3 px-3 py-2 text-left transition hover:bg-primary-50/40"
+                        >
+                          <span className="flex h-9 w-9 shrink-0 items-center justify-center overflow-hidden rounded-lg bg-white">
+                            {product.productImageSm ? (
+                              // eslint-disable-next-line @next/next/no-img-element
+                              <img src={product.productImageSm} alt="" className="h-full w-full object-cover" />
+                            ) : (
+                              <Icon name="box" size={16} className="text-primary-500" />
+                            )}
+                          </span>
+                          <span className="min-w-0 flex-1">
+                            <span className="block truncate text-sm font-semibold text-ink-900">{product.name}</span>
+                            <span className="block text-xs text-ink-400">{product.brand.name}</span>
+                          </span>
+                          <span className="shrink-0 text-xs font-semibold text-primary-600">Adicionar</span>
+                        </button>
+                      ),
+                    )}
+                  </div>
                 )}
               </div>
             )}

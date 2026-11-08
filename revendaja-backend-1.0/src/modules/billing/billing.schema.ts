@@ -7,7 +7,7 @@ export const checkoutSchema = z.object({
 export type CheckoutInput = z.infer<typeof checkoutSchema>;
 
 const planSchema = z.object({
-  id: z.enum(['free', 'starter', 'premium', 'business']),
+  id: z.enum(['free', 'starter', 'premium']),
   name: z.string(),
 });
 
@@ -23,7 +23,7 @@ export const billingOverviewResponseSchema = z.object({
     .nullable(),
   scheduledChange: z
     .object({
-      plan: z.enum(['free', 'starter', 'premium', 'business']),
+      plan: z.enum(['free', 'starter', 'premium']),
       effectiveAt: z.string(),
     })
     .nullable(),

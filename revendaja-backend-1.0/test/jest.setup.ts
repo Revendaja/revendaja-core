@@ -41,5 +41,4 @@ process.env.STRIPE_SECRET_KEY = 'sk_test_fake';
 process.env.STRIPE_WEBHOOK_SECRET = 'whsec_fake';
 process.env.STRIPE_PRICE_STARTER = 'price_starter';
 process.env.STRIPE_PRICE_PREMIUM = 'price_premium';
-process.env.STRIPE_PRICE_BUSINESS = 'price_business';
 process.env.WEB_APP_URL = 'http://localhost:3001';

@@ -223,6 +223,13 @@ export class AiService {
   ): Promise<void> {
     const limits = AI_PLAN_LIMITS[store.plan];
     const limit = field === 'messages' ? limits.messagesPerMonth : limits.transcriptionsPerMonth;
+    if (limit <= 0) {
+      throw new AppError(
+        `O assistente está disponível a partir do plano Inicial. Conheça os planos pagos para usar (seu plano: ${STORE_PLAN_NAMES[store.plan]}).`,
+        403,
+        'AI_PLAN_REQUIRED',
+      );
+    }
     if (await this.repository.reserveUsage(store.id, period.key, field, limit)) return;
 
     const resets = period.resetsAt.toLocaleDateString('pt-BR', {

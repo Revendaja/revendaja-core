@@ -17,7 +17,6 @@ const PLAN_ICON: Record<PlanId, keyof typeof Ionicons.glyphMap> = {
   free: 'pricetag-outline',
   starter: 'rocket-outline',
   premium: 'flash',
-  business: 'briefcase-outline',
 };
 
 export default function PlansScreen({ navigation }: Props) {

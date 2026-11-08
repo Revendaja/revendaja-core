@@ -14,6 +14,10 @@ export type EstoqueStackParamList = {
   NewProduct: undefined;
   // Adicionar um produto do catálogo com preço, ou editar o produto da loja.
   ProductForm: { catalogProduct: CatalogProduct } | { storeProductId: string };
+  // Escolher, no catálogo, qual produto adicionar (busca/scan da Nova venda sem resultado na loja).
+  CatalogMatches: { term: string };
+  // Adição rápida (só o preço) de um produto do catálogo, vinda da Nova venda.
+  QuickAddProduct: { catalogProduct: CatalogProduct };
   // Cadastrar um produto próprio (fora do catálogo) ou editar um já existente. undefined = criar.
   ManualProductForm: { storeProductId: string } | undefined;
 };
@@ -39,7 +43,8 @@ export type MoreStackParamList = {
 
 export type RootTabParamList = {
   Home: undefined;
-  EstoqueStack: undefined;
+  // Aceita `{ screen: 'ProductDetail', params }` (ex.: Nova venda levando ao estoque do produto recém-adicionado).
+  EstoqueStack: NavigatorScreenParams<EstoqueStackParamList> | undefined;
   NovaVenda: undefined;
   FinancasStack: undefined;
   // Aceita `{ screen: 'OnlineSales' }` etc. pra abrir uma tela específica da aba a partir da Início

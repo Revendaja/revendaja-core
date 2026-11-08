@@ -137,9 +137,9 @@ const validBody = {
   items: [{ storeProductId: PRODUCT_A, quantity: 2 }],
 };
 
-function arrangeVerifiedStore() {
+function arrangeVerifiedStore(plan: 'free' | 'starter' | 'premium' = 'free') {
   userFindUnique.mockResolvedValue(buildUserRow());
-  storeFindUnique.mockResolvedValue(OWN_STORE);
+  storeFindUnique.mockResolvedValue({ ...OWN_STORE, plan });
 }
 
 async function request(
@@ -1109,7 +1109,7 @@ describe('PATCH /sales/:id { status: "cancelled" } (cancela o pedido e devolve o
 
 describe('GET /sales/top-products', () => {
   it('soma quantidade e receita por produto (vendas pagas do período), ranking por quantidade', async () => {
-    arrangeVerifiedStore();
+    arrangeVerifiedStore('starter');
     saleItemFindMany.mockResolvedValue([
       { storeProductId: PRODUCT_A, quantity: 2, unitPrice: money(55) },
       { storeProductId: PRODUCT_A, quantity: 1, unitPrice: money(55) },
@@ -1157,7 +1157,7 @@ describe('GET /sales/top-products', () => {
   });
 
   it('respeita o limit (corta o ranking antes de buscar nome/imagem)', async () => {
-    arrangeVerifiedStore();
+    arrangeVerifiedStore('starter');
     saleItemFindMany.mockResolvedValue([
       { storeProductId: PRODUCT_A, quantity: 2, unitPrice: money(55) },
       { storeProductId: PRODUCT_B, quantity: 5, unitPrice: money(20) },
@@ -1181,7 +1181,7 @@ describe('GET /sales/top-products', () => {
   });
 
   it('400 quando from não é anterior a to', async () => {
-    arrangeVerifiedStore();
+    arrangeVerifiedStore('starter');
 
     const response = await request(
       'GET',
@@ -1194,7 +1194,7 @@ describe('GET /sales/top-products', () => {
 
 describe('GET /sales/stale-products', () => {
   it('lista produtos com estoque > 0 sem venda paga recente, com a última venda quando existir', async () => {
-    arrangeVerifiedStore();
+    arrangeVerifiedStore('premium');
     storeProductFindMany.mockResolvedValue([
       {
         id: PRODUCT_A,
@@ -1243,7 +1243,7 @@ describe('GET /sales/stale-products', () => {
   });
 
   it('filtra por estoque > 0 e "sem venda paga desde o corte" (dias)', async () => {
-    arrangeVerifiedStore();
+    arrangeVerifiedStore('premium');
     storeProductFindMany.mockResolvedValue([]);
 
     await request('GET', '/sales/stale-products?days=60');
@@ -1260,7 +1260,7 @@ describe('GET /sales/timeline', () => {
     '?from=2026-01-01T03:00:00.000Z&to=2026-03-01T03:00:00.000Z&groupBy=month&tzOffsetMinutes=-180';
 
   it('devolve receita e custo por mês (só vendas pagas), com meses vazios zerados', async () => {
-    arrangeVerifiedStore();
+    arrangeVerifiedStore('premium');
     saleFindMany.mockResolvedValue([
       {
         createdAt: new Date('2026-01-15T12:00:00.000Z'),
@@ -1299,7 +1299,7 @@ describe('GET /sales/timeline', () => {
     ['período maior que 366 dias', '?from=2025-01-01T00:00:00.000Z&to=2026-06-01T00:00:00.000Z'],
     ['groupBy inválido', '?from=2026-01-01T00:00:00.000Z&to=2026-02-01T00:00:00.000Z&groupBy=year'],
   ])('retorna 400 %s', async (_label, query) => {
-    arrangeVerifiedStore();
+    arrangeVerifiedStore('premium');
 
     const response = await request('GET', `/sales/timeline${query}`);
 
@@ -1327,7 +1327,7 @@ describe('GET /sales/top-brands', () => {
   });
 
   it('soma quantidade e receita por marca (vendas pagas), ranking por quantidade; ignora produto sem marca', async () => {
-    arrangeVerifiedStore();
+    arrangeVerifiedStore('premium');
     saleItemFindMany.mockResolvedValue([
       item(2, 55, { id: 1, name: 'Natura', logo: 'https://img/natura.png' }),
       item(1, 55, { id: 1, name: 'Natura', logo: 'https://img/natura.png' }),
@@ -1364,7 +1364,7 @@ describe('GET /sales/top-brands', () => {
   });
 
   it('respeita o limit', async () => {
-    arrangeVerifiedStore();
+    arrangeVerifiedStore('premium');
     saleItemFindMany.mockResolvedValue([
       item(2, 55, { id: 1, name: 'Natura', logo: null }),
       item(5, 20, { id: 2, name: 'Boticario', logo: null }),
@@ -1382,7 +1382,7 @@ describe('GET /sales/top-brands', () => {
     ['from depois de to', '?from=2026-10-01T00:00:00.000Z&to=2026-09-01T00:00:00.000Z'],
     ['limit acima do máximo', `${QUERY}&limit=21`],
   ])('retorna 400 %s', async (_label, query) => {
-    arrangeVerifiedStore();
+    arrangeVerifiedStore('premium');
 
     const response = await request('GET', `/sales/top-brands${query}`);
 
@@ -1394,5 +1394,25 @@ describe('GET /sales/top-brands', () => {
     const response = await request('GET', `/sales/top-brands${QUERY}`, undefined, null);
 
     expect(response.statusCode).toBe(401);
+  });
+});
+
+describe('relatórios por plano', () => {
+  it.each([
+    ['free', '/sales/top-products'],
+    ['free', '/sales/stale-products'],
+    ['free', '/sales/top-brands'],
+    ['starter', '/sales/stale-products'],
+    ['starter', '/sales/top-brands'],
+  ] as const)('plano %s: %s responde 403 PLAN_LIMIT_REACHED', async (plan, path) => {
+    arrangeVerifiedStore(plan);
+
+    const response = await request(
+      'GET',
+      `${path}?from=2026-09-01T00:00:00.000Z&to=2026-10-01T00:00:00.000Z`,
+    );
+
+    expect(response.statusCode).toBe(403);
+    expect(response.json().error).toBe('PLAN_LIMIT_REACHED');
   });
 });

@@ -6,7 +6,7 @@ export type AuthUser = {
   whatsapp: string | null;
 };
 
-export type StorePlanId = 'free' | 'starter' | 'premium' | 'business';
+export type StorePlanId = 'free' | 'starter' | 'premium';
 
 export type StoreInfo = {
   id: string;
@@ -453,7 +453,7 @@ export type StorefrontHome = {
     bio: string | null;
     logo: string | null;
     acceptedPaymentMethods: NewSalePaymentMethod[];
-    // Planos Pro e Empresarial tiram a marca do Revendajá do rodapé.
+    // Plano Pro tira a marca do Revendajá do rodapé.
     hideBranding: boolean;
   };
   config: StorefrontConfig;

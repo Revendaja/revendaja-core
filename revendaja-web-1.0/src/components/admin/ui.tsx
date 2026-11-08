@@ -74,7 +74,7 @@ export function Badge({ tone = 'neutral', children }: { tone?: Tone; children: R
   );
 }
 
-const PLAN_TONES: Record<PlanId, Tone> = { free: 'neutral', starter: 'warn', premium: 'good', business: 'good' };
+const PLAN_TONES: Record<PlanId, Tone> = { free: 'neutral', starter: 'warn', premium: 'good' };
 
 export function PlanBadge({ plan }: { plan: PlanId }) {
   return <Badge tone={PLAN_TONES[plan]}>{PLAN_LABELS[plan]}</Badge>;

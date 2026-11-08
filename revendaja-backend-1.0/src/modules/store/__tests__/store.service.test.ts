@@ -690,7 +690,6 @@ describe('StoreService', () => {
       ['free', 'Gratuito'],
       ['starter', 'Inicial'],
       ['premium', 'Pro'],
-      ['business', 'Empresarial'],
     ] as const)('getSettings: plano %s vira "%s"', async (plan, name) => {
       const repository = createRepositoryMock();
       repository.findByUserId.mockResolvedValue(buildStore());

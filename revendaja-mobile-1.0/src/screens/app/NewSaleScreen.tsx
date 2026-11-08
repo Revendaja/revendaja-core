@@ -9,9 +9,10 @@ import ProductImage from '../../components/ProductImage';
 import { Banner, PrimaryButton } from '../../components/AuthForm';
 import { createSale } from '../../api/sales';
 import { listStoreProducts } from '../../api/storeProducts';
+import { listCatalogProducts } from '../../api/catalog';
 import { getErrorMessage, isApiError } from '../../api/errors';
 import { queryKeys } from '../../api/queryKeys';
-import type { CreateSaleInput, NewSalePaymentMethod, StoreProduct } from '../../api/types';
+import type { CatalogProduct, CreateSaleInput, NewSalePaymentMethod, StoreProduct } from '../../api/types';
 import { useDebouncedValue } from '../../hooks/useDebouncedValue';
 import { useSubmitting } from '../../hooks/useSubmitting';
 import { useStoreAccessGuard } from '../../products/useStoreAccessGuard';
@@ -70,6 +71,20 @@ export default function NewSaleScreen({ navigation }: Props) {
   const results = term ? (searchQuery.data?.items ?? []) : [];
   const searching = term.length > 0 && searchQuery.isFetching;
   const searchError = searchQuery.isError ? getErrorMessage(searchQuery.error) : null;
+
+  // Produto que a loja não tem: leva para outra tela (escolher no catálogo / só o preço), em vez de
+  // mostrar produtos do catálogo aqui no meio da venda. Limpa a busca para a venda voltar limpa.
+  function goToCatalog(target: { catalogProduct: CatalogProduct } | { term: string }) {
+    setProductQuery('');
+    commitQuery('');
+    // `initial: false`: se a aba Estoque ainda não foi aberta, a lista dela entra por baixo e o "voltar" funciona.
+    navigation.navigate('EstoqueStack', {
+      ...('catalogProduct' in target
+        ? { screen: 'QuickAddProduct' as const, params: { catalogProduct: target.catalogProduct } }
+        : { screen: 'CatalogMatches' as const, params: { term: target.term } }),
+      initial: false,
+    });
+  }
 
   // Estoque mais recente: a lista de produtos (atualizada por vendas e edições) vale mais que a cópia do carrinho.
   const stockOf = (line: CartLine) => findById(line.item.id)?.stock ?? line.item.stock;
@@ -130,8 +145,19 @@ export default function NewSaleScreen({ navigation }: Props) {
       if (match) {
         addToCart(match);
       } else if (page.items.length === 0) {
-        Alert.alert('Produto não encontrado', `Nenhum produto da sua loja tem o código ${value}.`);
-        setProductQuery('');
+        // Não está na loja: se estiver no catálogo, leva para outra tela (direto ao preço quando for um
+        // único produto; à lista para escolher quando houver vários); senão, avisa que não existe.
+        const catalog = await guard(() => listCatalogProducts({ search: value, pageSize: 5 }));
+        const found = catalog.items.filter(
+          (item) => item.barCode && stripLeadingZeros(item.barCode) === stripLeadingZeros(value)
+        );
+        const candidate = found.length === 1 ? found[0] : catalog.items.length === 1 ? catalog.items[0] : null;
+        if (candidate) goToCatalog({ catalogProduct: candidate });
+        else if (catalog.items.length > 0) goToCatalog({ term: value });
+        else {
+          Alert.alert('Produto não encontrado', `Nenhum produto da sua loja nem do catálogo tem o código ${value}.`);
+          setProductQuery('');
+        }
       } else {
         // Mais de um resultado: quem escolhe é o usuário.
         setProductQuery(value);
@@ -387,6 +413,22 @@ export default function NewSaleScreen({ navigation }: Props) {
                     </Pressable>
                   );
                 })
+              )}
+
+              {!searching && !searchError && results.length === 0 && (
+                <Pressable
+                  onPress={() => goToCatalog({ term })}
+                  accessibilityRole="button"
+                  accessibilityLabel="Procurar no catálogo e adicionar à minha loja"
+                  className="flex-row items-center px-3 py-3"
+                  style={{ borderTopWidth: 1, borderTopColor: '#F5F6FA' }}
+                >
+                  <Ionicons name="add-circle" size={22} color="#FF6B00" />
+                  <Text className="flex-1 text-sm font-semibold text-primary-600 ml-2">
+                    Procurar no catálogo e adicionar
+                  </Text>
+                  <Ionicons name="chevron-forward" size={18} color="#C7C9D9" />
+                </Pressable>
               )}
             </View>
           )}

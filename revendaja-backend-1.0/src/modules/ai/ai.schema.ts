@@ -87,7 +87,7 @@ const usageCounterSchema = z.object({
 });
 
 export const usageResponseSchema = z.object({
-  plan: z.object({ id: z.enum(['free', 'starter', 'premium', 'business']), name: z.string() }),
+  plan: z.object({ id: z.enum(['free', 'starter', 'premium']), name: z.string() }),
   messages: usageCounterSchema,
   // Quando o limite volta a zerar (início do próximo mês).
   resetsAt: z.date(),

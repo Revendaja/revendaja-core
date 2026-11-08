@@ -94,7 +94,6 @@ enum Plan {
   free
   starter
   premium
-  business
 }
 
 model Store {

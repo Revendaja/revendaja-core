@@ -186,7 +186,7 @@ function Subscription() {
               >
                 Trocar plano
               </Link>
-              {planId !== 'business' && (
+              {planId !== 'premium' && (
                 <Link
                   href="/planos"
                   className="flex h-10 items-center rounded-xl bg-primary-500 px-4 text-xs font-semibold text-white transition hover:bg-primary-600"

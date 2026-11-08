@@ -8,6 +8,7 @@ import ProductImage from '../../components/ProductImage';
 import { ErrorState } from '../../components/ListStates';
 import { ReportRowSkeleton, SkeletonRows } from '../../components/Skeleton';
 import { getStaleProducts, getTopProducts } from '../../api/sales';
+import { getStoreSettings } from '../../api/stores';
 import { queryKeys } from '../../api/queryKeys';
 import type { StaleProduct, TopProduct } from '../../api/types';
 import { useStoreAccessGuard } from '../../products/useStoreAccessGuard';
@@ -18,6 +19,19 @@ type Props = NativeStackScreenProps<FinancasStackParamList, 'Reports'>;
 
 // Janela fixa de 30 dias na v1 (sem seletor de período): mantém a tela simples de olhar rápido.
 const WINDOW_DAYS = 30;
+
+// Cartão no lugar do relatório que o plano atual não inclui.
+function LockedReport({ plan, onPress }: { plan: string; onPress: () => void }) {
+  return (
+    <View className="bg-white rounded-2xl p-4 items-center mb-2">
+      <Ionicons name="lock-closed" size={18} color="#FF6B00" />
+      <Text className="text-xs text-ink-400 mt-2 mb-3 text-center">Disponível a partir do plano {plan}.</Text>
+      <Pressable onPress={onPress} accessibilityRole="button" className="h-9 px-5 rounded-full bg-primary-500 items-center justify-center">
+        <Text className="text-xs font-bold text-white">Ver planos</Text>
+      </Pressable>
+    </View>
+  );
+}
 
 function TopProductRow({ rank, item }: { rank: number; item: TopProduct }) {
   return (
@@ -81,17 +95,29 @@ export default function ReportsScreen({ navigation }: Props) {
   const fromIso = from.toISOString();
   const toIso = to.toISOString();
 
+  // Mais vendidos: Inicial em diante. Parados: só Pro. A API também barra; se o plano não carregar,
+  // deixa a API decidir.
+  const settingsQuery = useQuery({ queryKey: queryKeys.storeSettings(), queryFn: () => guard(() => getStoreSettings()) });
+  const planId = settingsQuery.data?.plan.id;
+  const planKnown = !settingsQuery.isPending;
+  const canTopProducts = planKnown && planId !== 'free';
+  const canStale = planKnown && (planId === undefined || planId === 'premium');
+
   const topProductsParams = { from: fromIso, to: toIso, limit: 10 };
   const topProductsQuery = useQuery({
     queryKey: queryKeys.sales.topProducts(topProductsParams),
     queryFn: () => guard(() => getTopProducts(topProductsParams)),
+    enabled: canTopProducts,
   });
 
   const staleProductsParams = { days: WINDOW_DAYS, limit: 20 };
   const staleProductsQuery = useQuery({
     queryKey: queryKeys.sales.staleProducts(staleProductsParams),
     queryFn: () => guard(() => getStaleProducts(staleProductsParams)),
+    enabled: canStale,
   });
+
+  const goToPlans = () => navigation.getParent()?.getParent()?.navigate('Main', { screen: 'MoreStack', params: { screen: 'Plans' } });
 
   const topProducts = topProductsQuery.data?.items ?? [];
   const staleProducts = staleProductsQuery.data?.items ?? [];
@@ -115,7 +141,9 @@ export default function ReportsScreen({ navigation }: Props) {
         <Text className="text-xs text-ink-400 mb-4">Últimos {WINDOW_DAYS} dias</Text>
 
         <Text className="text-sm font-extrabold text-ink-900 mb-3">Mais vendidos</Text>
-        {topProductsQuery.isPending ? (
+        {planKnown && !canTopProducts ? (
+          <LockedReport plan="Inicial" onPress={goToPlans} />
+        ) : topProductsQuery.isPending ? (
           <SkeletonRows Row={ReportRowSkeleton} count={3} />
         ) : topProductsQuery.isError ? (
           <ErrorState message="Não foi possível carregar os mais vendidos." onRetry={() => void topProductsQuery.refetch()} />
@@ -131,7 +159,9 @@ export default function ReportsScreen({ navigation }: Props) {
         <Text className="text-xs text-ink-400 mb-3">
           Produtos com estoque que não venderam nos últimos {WINDOW_DAYS} dias — candidatos a uma promoção.
         </Text>
-        {staleProductsQuery.isPending ? (
+        {planKnown && !canStale ? (
+          <LockedReport plan="Pro" onPress={goToPlans} />
+        ) : staleProductsQuery.isPending ? (
           <SkeletonRows Row={ReportRowSkeleton} count={3} />
         ) : staleProductsQuery.isError ? (
           <ErrorState message="Não foi possível carregar os produtos parados." onRetry={() => void staleProductsQuery.refetch()} />

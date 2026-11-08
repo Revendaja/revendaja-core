@@ -18,6 +18,7 @@ const GROUPS: NavGroup[] = [
     items: [
       { label: 'Painel', href: '/dashboard', icon: 'grid' },
       { label: 'Notificações', href: '/notificacoes', icon: 'bell' },
+      { label: 'Assistente', href: '/assistente', icon: 'sparkle' },
     ],
   },
   {

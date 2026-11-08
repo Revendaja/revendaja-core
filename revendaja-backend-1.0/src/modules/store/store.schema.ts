@@ -114,7 +114,7 @@ export const updateStoreSettingsSchema = z
 
 export const storeSettingsResponseSchema = z.object({
   plan: z.object({
-    id: z.enum(['free', 'starter', 'premium', 'business']),
+    id: z.enum(['free', 'starter', 'premium']),
     name: z.string(),
   }),
   acceptedPaymentMethods: z.array(acceptedPaymentMethodSchema),
@@ -124,7 +124,7 @@ export const storeSettingsResponseSchema = z.object({
 // Plano da loja com os limites e o uso atual (card "Limite do plano" do painel web).
 export const storePlanUsageResponseSchema = z.object({
   plan: z.object({
-    id: z.enum(['free', 'starter', 'premium', 'business']),
+    id: z.enum(['free', 'starter', 'premium']),
     name: z.string(),
   }),
   limits: z.object({

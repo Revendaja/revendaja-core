@@ -13,10 +13,9 @@ describe('findPlan', () => {
 
 describe('planRank', () => {
   it('ordena do mais barato ao mais caro', () => {
-    expect(PLANS.map((plan) => plan.id)).toEqual(['free', 'starter', 'premium', 'business']);
+    expect(PLANS.map((plan) => plan.id)).toEqual(['free', 'starter', 'premium']);
     expect(planRank('free')).toBeLessThan(planRank('starter'));
     expect(planRank('starter')).toBeLessThan(planRank('premium'));
-    expect(planRank('premium')).toBeLessThan(planRank('business'));
   });
 });
 
@@ -33,7 +32,6 @@ describe('productsOverLimit', () => {
 
   it('é zero em plano sem limite de produtos', () => {
     expect(productsOverLimit(5000, 'premium')).toBe(0);
-    expect(productsOverLimit(5000, 'business')).toBe(0);
   });
 });
 

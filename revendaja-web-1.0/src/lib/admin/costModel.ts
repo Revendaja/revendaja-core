@@ -2,15 +2,14 @@
 // premissas que a administradora digita e devolve custo, contribuição e resultado por plano. As
 // mesmas contas do relatório docs/RELATORIO_CUSTOS_PLANOS_E_IA.md (conferidas em costModel.test.ts).
 
-export type PlanId = 'free' | 'starter' | 'premium' | 'business';
-export const PLAN_IDS: PlanId[] = ['free', 'starter', 'premium', 'business'];
+export type PlanId = 'free' | 'starter' | 'premium';
+export const PLAN_IDS: PlanId[] = ['free', 'starter', 'premium'];
 export const PLAN_LABELS: Record<PlanId, string> = {
   free: 'Gratuito',
   starter: 'Inicial',
   premium: 'Pro',
-  business: 'Empresarial',
 };
-export const PAID_PLAN_IDS: PlanId[] = ['starter', 'premium', 'business'];
+export const PAID_PLAN_IDS: PlanId[] = ['starter', 'premium'];
 
 // Por onde o assinante paga a mensalidade. Cada canal fica com uma parte do que a loja paga.
 export type ChannelId = 'stripe' | 'apple' | 'google';
@@ -107,7 +106,6 @@ export const DEFAULT_INPUTS: CostInputs = {
     free: { price: 0, subscribers: 50, aiCap: 15, aiUtilization: 0.4, visits: 100 },
     starter: { price: 29.99, subscribers: 20, aiCap: 150, aiUtilization: 0.4, visits: 500 },
     premium: { price: 49.99, subscribers: 8, aiCap: 500, aiUtilization: 0.4, visits: 3000 },
-    business: { price: 129.99, subscribers: 2, aiCap: 1500, aiUtilization: 0.4, visits: 10000 },
   },
   ai: {
     priceIn: 0.1,
@@ -328,9 +326,9 @@ export function computeModel(inputs: CostInputs): ModelResult {
     const freeCost = plans.free.total * freeStores;
     netPerPayer = (paidContribution - freeCost) / payingStores;
   } else {
-    // Sem pagantes ainda: proporção sugerida 60/30/10 entre Inicial, Pro e Empresarial.
+    // Sem pagantes ainda: proporção sugerida 70/30 entre Inicial e Pro.
     netPerPayer =
-      plans.starter.contribution * 0.6 + plans.premium.contribution * 0.3 + plans.business.contribution * 0.1;
+      plans.starter.contribution * 0.7 + plans.premium.contribution * 0.3;
   }
 
   return {

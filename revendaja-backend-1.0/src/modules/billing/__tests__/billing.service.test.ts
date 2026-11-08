@@ -222,7 +222,7 @@ describe('BillingService', () => {
     it('downgrade fica agendado para o fim do ciclo, sem mexer no plano agora', async () => {
       repository.findStoreByUserId.mockResolvedValue(
         makeStore({
-          plan: 'business',
+          plan: 'premium',
           stripeSubscriptionId: 'sub_1',
           subscriptionStatus: 'active',
         }),
@@ -230,7 +230,7 @@ describe('BillingService', () => {
       stripe.subscriptions.retrieve.mockResolvedValue(
         makeSubscription({
           items: {
-            data: [{ id: 'si_1', price: { id: 'price_business' }, current_period_end: 200 }],
+            data: [{ id: 'si_1', price: { id: 'price_premium' }, current_period_end: 200 }],
           },
         }),
       );
@@ -247,7 +247,7 @@ describe('BillingService', () => {
       const params = stripe.subscriptionSchedules.update.mock.calls[0][1];
       expect(params.end_behavior).toBe('release');
       expect(params.phases[0]).toMatchObject({
-        items: [{ price: 'price_business', quantity: 1 }],
+        items: [{ price: 'price_premium', quantity: 1 }],
         start_date: 100,
         end_date: 200,
       });

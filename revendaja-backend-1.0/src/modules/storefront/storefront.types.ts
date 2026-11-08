@@ -83,7 +83,7 @@ export interface StorefrontHome {
     // Logo da loja (URL). null = a vitrine usa a inicial do nome.
     logo: string | null;
     acceptedPaymentMethods: AcceptedPaymentMethod[];
-    // Planos Pro e Empresarial tiram a marca do Revendajá do rodapé.
+    // Plano Pro tira a marca do Revendajá do rodapé.
     hideBranding: boolean;
   };
   config: StorefrontConfig;

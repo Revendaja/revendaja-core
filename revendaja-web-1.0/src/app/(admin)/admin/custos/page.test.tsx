@@ -25,7 +25,7 @@ function overview(): AdminOverview {
       new30d: 0,
       active30d: 0,
       paying: 4,
-      byPlan: { free: 6, starter: 3, premium: 1, business: 0 },
+      byPlan: { free: 6, starter: 3, premium: 1 },
     },
     subscriptions: { byStatus: {}, cancelAtPeriodEnd: 0, renewingIn7d: 0 },
     gmv: {
@@ -42,7 +42,6 @@ function overview(): AdminOverview {
 const EDITABLE_FIELDS = [
   'Inicial',
   'Pro',
-  'Empresarial',
   'Servidor (Fly.io)',
   'Banco de dados (Neon)',
   'Fila (Redis)',

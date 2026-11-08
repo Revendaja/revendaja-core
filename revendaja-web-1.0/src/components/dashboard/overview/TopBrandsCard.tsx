@@ -1,7 +1,10 @@
 'use client';
 
+import Link from 'next/link';
 import { useQuery } from '@tanstack/react-query';
 import { getTopBrands } from '@/lib/api/sales';
+import { getStorePlan } from '@/lib/api/stores';
+import { hasAdvancedReports } from '@/lib/data/plans';
 import { queryKeys } from '@/lib/api/queryKeys';
 import { getErrorMessage } from '@/lib/api/errors';
 import { formatCurrency } from '@/lib/utils/format';
@@ -9,8 +12,30 @@ import { Icon } from '../icons';
 import { Card, CardHeader } from './ui';
 
 export function TopBrandsCard() {
-  const brandsQuery = useQuery({ queryKey: queryKeys.topBrands(), queryFn: () => getTopBrands(3) });
+  // Marcas mais vendidas é relatório do plano Pro (a API também barra).
+  const planQuery = useQuery({ queryKey: queryKeys.storePlan(), queryFn: getStorePlan });
+  const planId = planQuery.data?.plan.id;
+  const locked = planId !== undefined && !hasAdvancedReports(planId);
+  const brandsQuery = useQuery({
+    queryKey: queryKeys.topBrands(),
+    queryFn: () => getTopBrands(3),
+    enabled: !planQuery.isPending && !locked,
+  });
   const brands = brandsQuery.data?.items;
+
+  if (locked) {
+    return (
+      <Card className="h-full">
+        <CardHeader title="Marcas mais vendidas" right={<Icon name="lock" size={15} className="text-ink-400" />} />
+        <div className="mt-3 flex flex-col items-center gap-2 rounded-xl border border-dashed border-ink-200 px-4 py-8 text-center">
+          <p className="text-xs text-ink-500">Disponível a partir do plano Pro.</p>
+          <Link href="/planos" className="text-xs font-semibold text-primary-600 hover:underline">
+            Ver planos
+          </Link>
+        </div>
+      </Card>
+    );
+  }
 
   return (
     <Card className="h-full">

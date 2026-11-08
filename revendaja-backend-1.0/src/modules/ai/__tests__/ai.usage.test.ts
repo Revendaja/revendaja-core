@@ -6,7 +6,7 @@ import { AiService } from '../ai.service';
 
 jest.mock('../tools', () => ({ TOOL_DEFINITIONS: [], getTool: () => undefined }));
 
-const STORE = { id: 'store-1', userId: 'user-1', storeName: 'Loja da Ana', plan: 'free' };
+const STORE = { id: 'store-1', userId: 'user-1', storeName: 'Loja da Ana', plan: 'starter' };
 
 function makeRepository(overrides: Record<string, jest.Mock> = {}) {
   return {
@@ -52,7 +52,7 @@ describe('limite de uso do assistente', () => {
       'store-1',
       usagePeriod().key,
       'messages',
-      AI_PLAN_LIMITS.free.messagesPerMonth,
+      AI_PLAN_LIMITS.starter.messagesPerMonth,
     );
     expect(repo.addTokens).toHaveBeenCalledWith('store-1', usagePeriod().key, 120, 30);
     expect(repo.releaseUsage).not.toHaveBeenCalled();
@@ -77,7 +77,7 @@ describe('limite de uso do assistente', () => {
 
     await expect(
       makeService(repo, makeClient(jest.fn())).chat('user-1', { message: 'oi' }),
-    ).rejects.toThrow(/15 mensagens.*Gratuito.*renova em \d{2}\/\d{2}/);
+    ).rejects.toThrow(/150 mensagens.*Inicial.*renova em \d{2}\/\d{2}/);
   });
 
   it('erro ao falar com o modelo devolve a mensagem reservada (a usuária não paga por falha)', async () => {
@@ -100,8 +100,8 @@ describe('limite de uso do assistente', () => {
 
     const usage = await makeService(repo, makeClient(jest.fn())).getUsage('user-1');
 
-    expect(usage.messages).toEqual({ used: 4, limit: 15, remaining: 11 });
-    expect(usage.plan).toEqual({ id: 'free', name: 'Gratuito' });
+    expect(usage.messages).toEqual({ used: 4, limit: 150, remaining: 146 });
+    expect(usage.plan).toEqual({ id: 'starter', name: 'Inicial' });
     expect(usage.resetsAt.getTime()).toBeGreaterThan(Date.now());
   });
 
@@ -109,12 +109,35 @@ describe('limite de uso do assistente', () => {
     const repo = makeRepository({
       getUsage: jest
         .fn()
-        .mockResolvedValue({ messages: 99, transcriptions: 0, inputTokens: 0, outputTokens: 0 }),
+        .mockResolvedValue({ messages: 999, transcriptions: 0, inputTokens: 0, outputTokens: 0 }),
     });
 
     const usage = await makeService(repo, makeClient(jest.fn())).getUsage('user-1');
 
     expect(usage.messages.remaining).toBe(0);
+  });
+});
+
+describe('plano Gratuito', () => {
+  function freeService(repo: AiRepository, client: OpenAI) {
+    const stores = { findByUserId: jest.fn().mockResolvedValue({ ...STORE, plan: 'free' }) };
+    return new AiService(repo, stores as never, () => client);
+  }
+
+  it('chat: tem uma cota pequena de mensagens para experimentar o assistente', async () => {
+    const repo = makeRepository();
+
+    await freeService(repo, makeClient(jest.fn().mockResolvedValue(reply))).chat('user-1', {
+      message: 'oi',
+    });
+
+    expect(AI_PLAN_LIMITS.free.messagesPerMonth).toBe(15);
+    expect(repo.reserveUsage).toHaveBeenCalledWith(
+      'store-1',
+      usagePeriod().key,
+      'messages',
+      AI_PLAN_LIMITS.free.messagesPerMonth,
+    );
   });
 });
 
@@ -136,7 +159,7 @@ describe('transcrição de voz', () => {
       'store-1',
       usagePeriod().key,
       'transcriptions',
-      AI_PLAN_LIMITS.free.transcriptionsPerMonth,
+      AI_PLAN_LIMITS.starter.transcriptionsPerMonth,
     );
   });
 

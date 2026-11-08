@@ -26,6 +26,8 @@ export const PLANS: PlanInfo[] = [
       'Catálogo com até 30 produtos',
       'Vitrine virtual própria',
       'Só produtos do catálogo (sem cadastro manual)',
+      'Assistente de IA (15 mensagens/mês)',
+      'Resumo financeiro do mês',
       'Suporte por e-mail',
     ],
   },
@@ -40,6 +42,7 @@ export const PLANS: PlanInfo[] = [
       'Catálogo com até 200 produtos',
       'Cadastro manual e cestas (kits)',
       'Categorias e preço promocional',
+      'Assistente de IA (150 mensagens/mês, texto e voz)',
       'Relatório dos mais vendidos',
       'Suporte por e-mail com prioridade',
     ],
@@ -54,23 +57,10 @@ export const PLANS: PlanInfo[] = [
     highlight: true,
     features: [
       'Produtos ilimitados',
-      'Todos os relatórios (mais vendidos e parados)',
+      'Assistente de IA (500 mensagens/mês, texto e voz)',
+      'Relatórios de produtos parados e marcas mais vendidas',
       'Vitrine sem a marca Revendajá',
       'Suporte prioritário no WhatsApp',
-    ],
-  },
-  {
-    id: 'business',
-    maxProducts: null,
-    name: 'Empresarial',
-    priceLabel: 'R$ 129,99',
-    billingLabel: '/mês',
-    tagline: 'Para operações em equipe',
-    features: [
-      'Tudo do plano Pro',
-      'Múltiplas usuárias na mesma loja',
-      'Exportação de dados e relatório por período',
-      'Suporte dedicado',
     ],
   },
 ];
@@ -83,6 +73,16 @@ export function findPlan(id: StorePlanId | undefined) {
 export function productsOverLimit(productCount: number, planId: StorePlanId) {
   const max = findPlan(planId).maxProducts;
   return max === null ? 0 : Math.max(0, productCount - max);
+}
+
+// Relatórios por plano (espelha STORE_PLAN_LIMITS do backend): mais vendidos a partir do Inicial;
+// produtos parados e marcas só no Pro. Quem barra de fato é a API.
+export function hasTopProductsReport(planId: StorePlanId) {
+  return planRank(planId) >= planRank('starter');
+}
+
+export function hasAdvancedReports(planId: StorePlanId) {
+  return planRank(planId) >= planRank('premium');
 }
 
 // Ordem do mais barato ao mais caro (a mesma da lista PLANS): decide se trocar é upgrade ou downgrade.

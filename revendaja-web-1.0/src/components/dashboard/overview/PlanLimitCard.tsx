@@ -92,7 +92,7 @@ function PlanLimitContent({ data }: { data: StorePlanUsage }) {
         {remaining === null
           ? 'Produtos ilimitados no seu plano.'
           : full
-            ? 'Limite atingido: faça upgrade para cadastrar mais.'
+            ? 'Limite atingido: conheça os planos pagos para cadastrar mais.'
             : `Você ainda pode cadastrar ${remaining} ${remaining === 1 ? 'produto' : 'produtos'}.`}
       </p>
 
@@ -114,7 +114,7 @@ function PlanLimitContent({ data }: { data: StorePlanUsage }) {
         ))}
       </ul>
 
-      {(full || nearLimit || !limits.manualProductsEnabled) && (
+      {(full || nearLimit || !limits.manualProductsEnabled || data.plan.id === 'free') && (
         <Link href="/planos" className="mt-3 inline-block text-xs font-semibold text-primary-600 hover:underline">
           Ver planos
         </Link>

@@ -57,7 +57,7 @@ export interface Sale {
   source: SaleSource;
 }
 
-export type PlanId = 'free' | 'starter' | 'premium' | 'business';
+export type PlanId = 'free' | 'starter' | 'premium';
 
 export interface Plan {
   id: PlanId;

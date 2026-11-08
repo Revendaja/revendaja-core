@@ -242,7 +242,6 @@ describe('StorefrontService#getHome', () => {
       ['free', false],
       ['starter', false],
       ['premium', true],
-      ['business', true],
     ] as const)('plano %s: hideBranding = %s', async (plan, expected) => {
       const { stores, service } = build();
       stores.findByHandle.mockResolvedValue(buildStore({ plan }));

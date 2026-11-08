@@ -1,6 +1,12 @@
-import { AppError, ConflictError, NotFoundError } from '../../shared/errors/AppError';
+import {
+  AppError,
+  ConflictError,
+  NotFoundError,
+  PlanLimitError,
+} from '../../shared/errors/AppError';
 import type { Paginated } from '../catalog/catalog.types';
 import { storeRepository, type StoreRepository } from '../store/store.repository';
+import { STORE_PLAN_LIMITS, STORE_PLAN_NAMES, type StorePlanLimits } from '../store/store.plans';
 import type { Store } from '../store/store.types';
 import { salesRepository, type SalesRepository } from './sales.repository';
 import type { CreateSaleInput, ListSalesQuery, SalesTimelineQuery } from './sales.schema';
@@ -37,6 +43,20 @@ function assertNoDuplicateItems(items: { storeProductId: string }[]): void {
       'O mesmo produto aparece mais de uma vez na venda. Some as quantidades em um único item.',
       400,
       'DUPLICATE_SALE_ITEM',
+    );
+  }
+}
+
+// Relatórios que dependem do plano (mais vendidos: Inicial+; parados e marcas: Pro).
+function assertReportAllowed(
+  store: Store,
+  feature: keyof Pick<StorePlanLimits, 'topProductsReportEnabled' | 'advancedReportsEnabled'>,
+  label: string,
+  requiredPlan: string,
+): void {
+  if (!STORE_PLAN_LIMITS[store.plan][feature]) {
+    throw new PlanLimitError(
+      `${label} não está disponível no plano ${STORE_PLAN_NAMES[store.plan]}. Faça upgrade para ${requiredPlan} ou superior.`,
     );
   }
 }
@@ -192,16 +212,29 @@ export class SalesService {
 
   async topProducts(userId: string, from: Date, to: Date, limit: number): Promise<TopProduct[]> {
     const store = await this.getOwnStoreOrThrow(userId);
+    assertReportAllowed(
+      store,
+      'topProductsReportEnabled',
+      'O relatório de mais vendidos',
+      'o Inicial',
+    );
     return this.repository.topProducts(store.id, from, to, limit);
   }
 
   async topBrands(userId: string, from: Date, to: Date, limit: number): Promise<TopBrand[]> {
     const store = await this.getOwnStoreOrThrow(userId);
+    assertReportAllowed(store, 'advancedReportsEnabled', 'O relatório de marcas', 'o Pro');
     return this.repository.topBrands(store.id, from, to, limit);
   }
 
   async staleProducts(userId: string, days: number, limit: number): Promise<StaleProduct[]> {
     const store = await this.getOwnStoreOrThrow(userId);
+    assertReportAllowed(
+      store,
+      'advancedReportsEnabled',
+      'O relatório de produtos parados',
+      'o Pro',
+    );
     const cutoff = new Date(Date.now() - days * 24 * 60 * 60 * 1000);
     return this.repository.staleProducts(store.id, cutoff, limit);
   }

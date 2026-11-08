@@ -2,7 +2,7 @@ import { z } from 'zod';
 
 export const adminStoresQuerySchema = z.object({
   search: z.string().trim().min(1).max(80).optional(),
-  plan: z.enum(['free', 'starter', 'premium', 'business']).optional(),
+  plan: z.enum(['free', 'starter', 'premium']).optional(),
   sort: z.enum(['created', 'gmv', 'ai', 'lastSale']).default('created'),
   page: z.coerce.number().int().positive().default(1),
   pageSize: z.coerce.number().int().positive().max(100).default(25),

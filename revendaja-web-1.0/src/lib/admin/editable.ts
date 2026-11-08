@@ -6,7 +6,7 @@ import { CHANNEL_IDS, DEFAULT_INPUTS, type ChannelId, type CostInputs, type Plan
 // sistema ou é fixo, e por isso não tem campo para editar.
 
 export type EditablePlanId = Exclude<PlanId, 'free'>;
-export const EDITABLE_PLAN_IDS: EditablePlanId[] = ['starter', 'premium', 'business'];
+export const EDITABLE_PLAN_IDS: EditablePlanId[] = ['starter', 'premium'];
 
 export interface EditableCosts {
   // Mensalidade de cada plano pago, em R$.
@@ -21,7 +21,6 @@ export const DEFAULT_EDITABLE: EditableCosts = {
   prices: {
     starter: DEFAULT_INPUTS.plans.starter.price,
     premium: DEFAULT_INPUTS.plans.premium.price,
-    business: DEFAULT_INPUTS.plans.business.price,
   },
   servicesUsd: {
     server: DEFAULT_INPUTS.infra.flyMachines * DEFAULT_INPUTS.infra.flyUsdPerMachine,

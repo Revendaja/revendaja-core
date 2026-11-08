@@ -58,21 +58,17 @@ describe('custo por plano (cenário do relatório: tudo pela Stripe, sem MEI)', 
     expect(plans.free.total).toBeCloseTo(0.09, 2);
     expect(plans.starter.total).toBeCloseTo(2.21, 2);
     expect(plans.premium.total).toBeCloseTo(4.61, 2);
-    expect(plans.business.total).toBeCloseTo(12.36, 2);
   });
 
   it('margens típicas', () => {
     expect(plans.starter.marginPct).toBeCloseTo(92.6, 1);
     expect(plans.premium.marginPct).toBeCloseTo(90.8, 1);
-    expect(plans.business.marginPct).toBeCloseTo(90.5, 1);
     expect(plans.free.marginPct).toBeNull();
   });
 
   it('pior caso (cota 100%, só ações, tudo por voz)', () => {
     expect(plans.starter.worstTotal).toBeCloseTo(5.17, 2);
     expect(plans.premium.worstTotal).toBeCloseTo(14.47, 2);
-    expect(plans.business.worstTotal).toBeCloseTo(41.93, 2);
-    expect(plans.business.worstMarginPct).toBeCloseTo(67.7, 1);
   });
 
   it('a Stripe cobra 3,99% + R$ 0,39 só nos planos pagos', () => {
@@ -151,7 +147,6 @@ const PLAN_SUBSCRIBERS = [
   ['free', DEFAULT_INPUTS.plans.free.subscribers],
   ['starter', DEFAULT_INPUTS.plans.starter.subscribers],
   ['premium', DEFAULT_INPUTS.plans.premium.subscribers],
-  ['business', DEFAULT_INPUTS.plans.business.subscribers],
 ] as const;
 
 describe('MEI', () => {
@@ -201,13 +196,13 @@ describe('empresa', () => {
 
   it('receita recorrente e resultado do mês', () => {
     const model = computeModel(inputs());
-    expect(model.mrr).toBeCloseTo(29.99 * 20 + 49.99 * 8 + 129.99 * 2, 2);
-    expect(model.payingStores).toBe(30);
+    expect(model.mrr).toBeCloseTo(29.99 * 20 + 49.99 * 8, 2);
+    expect(model.payingStores).toBe(28);
     expect(model.freeStores).toBe(50);
     expect(model.profit).toBeCloseTo(model.mrr - model.variableCost - model.fixedBrl, 6);
   });
 
-  it('ponto de equilíbrio do relatório: ~7 assinantes para a infraestrutura e ~78 com um salário de R$ 3.000', () => {
+  it('ponto de equilíbrio do relatório: ~8 assinantes para a infraestrutura e ~97 com um salário de R$ 3.000', () => {
     const base: CostInputs = {
       ...LEGACY,
       plans: {
@@ -215,15 +210,14 @@ describe('empresa', () => {
         free: { ...DEFAULT_INPUTS.plans.free, subscribers: 0 },
         starter: { ...DEFAULT_INPUTS.plans.starter, subscribers: 60 },
         premium: { ...DEFAULT_INPUTS.plans.premium, subscribers: 30 },
-        business: { ...DEFAULT_INPUTS.plans.business, subscribers: 10 },
       },
       infra: { ...LEGACY.infra, ...INFRA_PRESETS.stable },
       targetProfitBrl: 3000,
     };
     const model = computeModel(base);
-    expect(model.breakEvenInfra).toBe(7);
-    expect(model.breakEvenTarget).toBeGreaterThanOrEqual(77);
-    expect(model.breakEvenTarget).toBeLessThanOrEqual(80);
+    expect(model.breakEvenInfra).toBe(8);
+    expect(model.breakEvenTarget).toBeGreaterThanOrEqual(95);
+    expect(model.breakEvenTarget).toBeLessThanOrEqual(99);
   });
 
   it('com comissão de lojas e MEI, o equilíbrio exige mais assinantes', () => {
@@ -240,7 +234,6 @@ describe('empresa', () => {
         ...DEFAULT_INPUTS.plans,
         starter: { ...DEFAULT_INPUTS.plans.starter, subscribers: 0 },
         premium: { ...DEFAULT_INPUTS.plans.premium, subscribers: 0 },
-        business: { ...DEFAULT_INPUTS.plans.business, subscribers: 0 },
       },
     });
     expect(model.breakEvenInfra).toBeNull();

@@ -14,7 +14,7 @@ const AI_HISTORY_MONTHS = 6;
 const AI_TOP_STORES = 50;
 const QUEUE_TIMEOUT_MS = 3000;
 
-const PLAN_IDS: StorePlan[] = ['free', 'starter', 'premium', 'business'];
+const PLAN_IDS: StorePlan[] = ['free', 'starter', 'premium'];
 
 // "2026-11" -> "2026-10".
 function previousPeriod(key: string): string {
@@ -58,7 +58,7 @@ export class AdminService {
       ]);
 
     // Quem paga: plano pago com assinatura em dia (mesma regra de `hasPlanAccess`).
-    const paying = (['starter', 'premium', 'business'] as const).reduce(
+    const paying = (['starter', 'premium'] as const).reduce(
       (sum, id) => sum + stores.byPlan[id],
       0,
     );
@@ -190,9 +190,7 @@ export class AdminService {
       {
         id: 'stripePrices',
         label: 'Preços dos planos na Stripe',
-        ok: Boolean(
-          env.STRIPE_PRICE_STARTER && env.STRIPE_PRICE_PREMIUM && env.STRIPE_PRICE_BUSINESS,
-        ),
+        ok: Boolean(env.STRIPE_PRICE_STARTER && env.STRIPE_PRICE_PREMIUM),
         detail: '',
       },
       {

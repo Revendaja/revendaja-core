@@ -5,13 +5,12 @@ import type { StorePlan } from '../store/store.types';
 // assinatura ativa.
 export type PaidPlan = Exclude<StorePlan, 'free'>;
 
-export const PAID_PLANS = ['starter', 'premium', 'business'] as const satisfies readonly PaidPlan[];
+export const PAID_PLANS = ['starter', 'premium'] as const satisfies readonly PaidPlan[];
 
 function priceIds(): Record<PaidPlan, string | undefined> {
   return {
     starter: env.STRIPE_PRICE_STARTER,
     premium: env.STRIPE_PRICE_PREMIUM,
-    business: env.STRIPE_PRICE_BUSINESS,
   };
 }
 
@@ -25,7 +24,7 @@ export function planForPriceId(priceId: string): PaidPlan | undefined {
   return PAID_PLANS.find((plan) => priceIds()[plan] === priceId);
 }
 
-const PLAN_RANK: Record<StorePlan, number> = { free: 0, starter: 1, premium: 2, business: 3 };
+const PLAN_RANK: Record<StorePlan, number> = { free: 0, starter: 1, premium: 2 };
 
 // Ir para um plano mais caro? (Decide como cobrar a troca: upgrade cobra a diferença na hora,
 // downgrade vira crédito proporcional na próxima fatura.)

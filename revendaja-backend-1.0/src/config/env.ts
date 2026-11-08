@@ -136,11 +136,6 @@ const envSchema = z
       .trim()
       .optional()
       .transform((value) => value || undefined),
-    STRIPE_PRICE_BUSINESS: z
-      .string()
-      .trim()
-      .optional()
-      .transform((value) => value || undefined),
     // URL do painel web, para onde a Stripe devolve a usuária depois do pagamento/portal.
     WEB_APP_URL: z.string().url().default('http://localhost:3001'),
 

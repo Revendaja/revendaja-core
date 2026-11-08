@@ -260,7 +260,6 @@ describe('HomeService', () => {
       ['free', 'Gratuito'],
       ['starter', 'Inicial'],
       ['premium', 'Pro'],
-      ['business', 'Empresarial'],
     ] as const)('plano %s aparece como "%s"', async (id, name) => {
       const { stores, service } = build();
       stores.getSettings.mockResolvedValue({ monthlyGoal: null, plan: id });

@@ -1,6 +1,7 @@
 'use client';
 
 import { useMemo, useState } from 'react';
+import Link from 'next/link';
 import { useQuery } from '@tanstack/react-query';
 import {
   getSalesSummary,
@@ -8,7 +9,9 @@ import {
   getTopBrandsInRange,
   getTopProducts,
 } from '@/lib/api/sales';
+import { getStorePlan } from '@/lib/api/stores';
 import { queryKeys } from '@/lib/api/queryKeys';
+import { hasAdvancedReports, hasTopProductsReport } from '@/lib/data/plans';
 import { getErrorMessage } from '@/lib/api/errors';
 import { formatCurrency } from '@/lib/utils/format';
 import { formatDateShort, MONTHS, periodRange, roundMoney, type Period } from '@/lib/utils/sales';
@@ -31,6 +34,14 @@ export default function ReportsPage() {
   const toIso = range.to.toISOString();
   const periodParams = { from: fromIso, to: toIso };
 
+  // Mais vendidos: Inicial em diante. Parados e marcas: só Pro (a API também barra). Se o plano não
+  // carregar, deixa a API decidir.
+  const planQuery = useQuery({ queryKey: queryKeys.storePlan(), queryFn: getStorePlan });
+  const planId = planQuery.data?.plan.id;
+  const planKnown = !planQuery.isPending;
+  const canTopProducts = planKnown && (planId ? hasTopProductsReport(planId) : true);
+  const canAdvanced = planKnown && (planId ? hasAdvancedReports(planId) : true);
+
   const summaryQuery = useQuery({
     queryKey: queryKeys.salesSummary(periodParams),
     queryFn: () => getSalesSummary(periodParams),
@@ -38,14 +49,17 @@ export default function ReportsPage() {
   const brandsQuery = useQuery({
     queryKey: queryKeys.salesTopBrandsRange({ ...periodParams, limit: TOP_BRANDS_LIMIT }),
     queryFn: () => getTopBrandsInRange(periodParams, TOP_BRANDS_LIMIT),
+    enabled: canAdvanced,
   });
   const productsQuery = useQuery({
     queryKey: queryKeys.salesTopProducts({ ...periodParams, limit: TOP_PRODUCTS_LIMIT }),
     queryFn: () => getTopProducts(periodParams, TOP_PRODUCTS_LIMIT),
+    enabled: canTopProducts,
   });
   const staleQuery = useQuery({
     queryKey: queryKeys.salesStaleProducts(STALE_DAYS),
     queryFn: () => getStaleProducts(STALE_DAYS, STALE_LIMIT),
+    enabled: canAdvanced,
   });
 
   const summary = summaryQuery.data;
@@ -153,35 +167,43 @@ export default function ReportsPage() {
         <Card>
           <CardHeader title="Marcas mais vendidas" right={<Icon name="star" size={15} className="text-ink-400" />} />
           <p className="mt-0.5 text-[11px] text-ink-400">{periodLabel(period, selectedMonth, today)}</p>
-          <RankList
-            state={brandsQuery}
-            empty="Nenhuma venda de marca neste período."
-            rows={brandsQuery.data?.items.map((brand) => ({
-              key: String(brand.brandId),
-              name: brand.name,
-              image: brand.logo,
-              fallback: brand.name.charAt(0).toUpperCase(),
-              quantity: brand.quantitySold,
-              revenue: brand.revenue,
-            }))}
-          />
+          {planKnown && !canAdvanced ? (
+            <LockedReport plan="Pro" />
+          ) : (
+            <RankList
+              state={brandsQuery}
+              empty="Nenhuma venda de marca neste período."
+              rows={brandsQuery.data?.items.map((brand) => ({
+                key: String(brand.brandId),
+                name: brand.name,
+                image: brand.logo,
+                fallback: brand.name.charAt(0).toUpperCase(),
+                quantity: brand.quantitySold,
+                revenue: brand.revenue,
+              }))}
+            />
+          )}
         </Card>
 
         <Card>
           <CardHeader title="Produtos mais vendidos" right={<Icon name="box" size={15} className="text-ink-400" />} />
           <p className="mt-0.5 text-[11px] text-ink-400">{periodLabel(period, selectedMonth, today)}</p>
-          <RankList
-            state={productsQuery}
-            empty="Nenhuma venda paga neste período."
-            rows={productsQuery.data?.items.map((product) => ({
-              key: product.storeProductId,
-              name: product.name,
-              image: product.image,
-              fallback: null,
-              quantity: product.quantitySold,
-              revenue: product.revenue,
-            }))}
-          />
+          {planKnown && !canTopProducts ? (
+            <LockedReport plan="Inicial" />
+          ) : (
+            <RankList
+              state={productsQuery}
+              empty="Nenhuma venda paga neste período."
+              rows={productsQuery.data?.items.map((product) => ({
+                key: product.storeProductId,
+                name: product.name,
+                image: product.image,
+                fallback: null,
+                quantity: product.quantitySold,
+                revenue: product.revenue,
+              }))}
+            />
+          )}
         </Card>
       </div>
 
@@ -191,31 +213,50 @@ export default function ReportsPage() {
           Têm estoque e não venderam nos últimos {STALE_DAYS} dias — bons candidatos a uma promoção.
         </p>
 
-        <div className="mt-3 flex flex-col gap-2.5">
-          {staleQuery.isPending && <SkeletonRows count={3} />}
-          {staleQuery.isError && (
-            <ErrorBox message={getErrorMessage(staleQuery.error)} onRetry={() => void staleQuery.refetch()} />
-          )}
-          {staleQuery.data?.items.length === 0 && (
-            <p className="py-6 text-center text-xs text-ink-400">Nenhum produto parado — tudo girando bem!</p>
-          )}
-          {staleQuery.data?.items.map((item) => (
-            <div key={item.storeProductId} className="flex items-center gap-3 rounded-xl border border-ink-100 p-3">
-              <Thumb image={item.image} fallback={null} />
-              <div className="min-w-0 flex-1 leading-tight">
-                <p className="truncate text-[13px] font-semibold text-ink-900">{item.name}</p>
-                <p className="mt-0.5 text-[11px] text-warning">
-                  {item.lastSoldAt ? `Última venda em ${formatDateShort(item.lastSoldAt)}` : 'Nunca vendido'}
-                </p>
+        {planKnown && !canAdvanced ? (
+          <LockedReport plan="Pro" />
+        ) : (
+          <div className="mt-3 flex flex-col gap-2.5">
+            {staleQuery.isPending && <SkeletonRows count={3} />}
+            {staleQuery.isError && (
+              <ErrorBox message={getErrorMessage(staleQuery.error)} onRetry={() => void staleQuery.refetch()} />
+            )}
+            {staleQuery.data?.items.length === 0 && (
+              <p className="py-6 text-center text-xs text-ink-400">Nenhum produto parado — tudo girando bem!</p>
+            )}
+            {staleQuery.data?.items.map((item) => (
+              <div key={item.storeProductId} className="flex items-center gap-3 rounded-xl border border-ink-100 p-3">
+                <Thumb image={item.image} fallback={null} />
+                <div className="min-w-0 flex-1 leading-tight">
+                  <p className="truncate text-[13px] font-semibold text-ink-900">{item.name}</p>
+                  <p className="mt-0.5 text-[11px] text-warning">
+                    {item.lastSoldAt ? `Última venda em ${formatDateShort(item.lastSoldAt)}` : 'Nunca vendido'}
+                  </p>
+                </div>
+                <div className="text-right leading-tight">
+                  <p className="text-[13px] font-semibold text-ink-900">{formatCurrency(item.price)}</p>
+                  <p className="mt-0.5 text-[11px] text-ink-400">{item.stock} em estoque</p>
+                </div>
               </div>
-              <div className="text-right leading-tight">
-                <p className="text-[13px] font-semibold text-ink-900">{formatCurrency(item.price)}</p>
-                <p className="mt-0.5 text-[11px] text-ink-400">{item.stock} em estoque</p>
-              </div>
-            </div>
-          ))}
-        </div>
+            ))}
+          </div>
+        )}
       </Card>
+    </div>
+  );
+}
+
+// Cartão no lugar do relatório que o plano atual não inclui.
+function LockedReport({ plan }: { plan: string }) {
+  return (
+    <div className="mt-3 flex flex-col items-center gap-2 rounded-xl border border-dashed border-ink-200 px-4 py-8 text-center">
+      <span className="flex h-9 w-9 items-center justify-center rounded-full bg-primary-50 text-primary-500">
+        <Icon name="lock" size={16} />
+      </span>
+      <p className="text-xs text-ink-500">Disponível a partir do plano {plan}.</p>
+      <Link href="/planos" className="text-xs font-semibold text-primary-600 hover:underline">
+        Ver planos
+      </Link>
     </div>
   );
 }

@@ -22,6 +22,8 @@ import CatalogScreen from '../screens/app/CatalogScreen';
 import ProductDetailScreen from '../screens/app/ProductDetailScreen';
 import NewProductScreen from '../screens/app/NewProductScreen';
 import ProductFormScreen from '../screens/app/ProductFormScreen';
+import CatalogMatchesScreen from '../screens/app/CatalogMatchesScreen';
+import QuickAddProductScreen from '../screens/app/QuickAddProductScreen';
 import ManualProductFormScreen from '../screens/app/ManualProductFormScreen';
 import NewSaleScreen from '../screens/app/NewSaleScreen';
 import SalesScreen from '../screens/app/SalesScreen';
@@ -76,6 +78,8 @@ function EstoqueStack() {
       <EstoqueStackNav.Screen name="ProductDetail" component={ProductDetailScreen} />
       <EstoqueStackNav.Screen name="NewProduct" component={NewProductScreen} />
       <EstoqueStackNav.Screen name="ProductForm" component={ProductFormScreen} />
+      <EstoqueStackNav.Screen name="CatalogMatches" component={CatalogMatchesScreen} />
+      <EstoqueStackNav.Screen name="QuickAddProduct" component={QuickAddProductScreen} />
       <EstoqueStackNav.Screen name="ManualProductForm" component={ManualProductFormScreen} />
     </EstoqueStackNav.Navigator>
   );

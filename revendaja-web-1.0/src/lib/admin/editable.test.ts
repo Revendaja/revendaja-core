@@ -6,7 +6,7 @@ import { applyRealData } from './realModel';
 
 const empty = { messages: 0, transcriptions: 0, inputTokens: 0, outputTokens: 0, storesUsing: 0 };
 
-function overview(byPlan = { free: 5, starter: 4, premium: 2, business: 1 }): AdminOverview {
+function overview(byPlan = { free: 5, starter: 4, premium: 2 }): AdminOverview {
   return {
     generatedAt: new Date().toISOString(),
     users: { total: 0, verified: 0, new7d: 0, new30d: 0 },
@@ -47,7 +47,7 @@ describe('valores editáveis', () => {
 
   it('o preço dos planos e o custo dos serviços entram no modelo', () => {
     const inputs = inputsFromEditable({
-      prices: { starter: 39.9, premium: 59.9, business: 149.9 },
+      prices: { starter: 39.9, premium: 59.9 },
       servicesUsd: { server: 13.4, database: 19, queue: 10 },
       channelShares: { stripe: 0.5, apple: 0.25, google: 0.25 },
     });
@@ -58,7 +58,7 @@ describe('valores editáveis', () => {
   });
 
   it('o resto não muda: continua com os valores fixos', () => {
-    const inputs = inputsFromEditable({ ...DEFAULT_EDITABLE, prices: { starter: 99, premium: 99, business: 99 } });
+    const inputs = inputsFromEditable({ ...DEFAULT_EDITABLE, prices: { starter: 99, premium: 99 } });
     expect(inputs.fx).toBe(DEFAULT_INPUTS.fx);
     expect(inputs.ai).toEqual(DEFAULT_INPUTS.ai);
     // As comissões dos canais e o imposto do MEI são fixos: só a divisão entre os canais é editável.
@@ -77,7 +77,6 @@ describe('valores editáveis', () => {
     });
     expect(merged.prices.starter).toBe(DEFAULT_EDITABLE.prices.starter);
     expect(merged.prices.premium).toBe(DEFAULT_EDITABLE.prices.premium);
-    expect(merged.prices.business).toBe(99.9);
     expect(merged.servicesUsd.server).toBe(8);
     expect(merged.servicesUsd.database).toBe(DEFAULT_EDITABLE.servicesUsd.database);
     expect(merged.channelShares.stripe).toBe(0.4);
@@ -93,7 +92,6 @@ describe('applyRealData', () => {
   it('usa as lojas reais de cada plano', () => {
     const { inputs } = applyRealData(base, overview());
     expect(inputs.plans.starter.subscribers).toBe(4);
-    expect(inputs.plans.business.subscribers).toBe(1);
     expect(inputs.plans.free.subscribers).toBe(5);
   });
 
@@ -105,8 +103,6 @@ describe('applyRealData', () => {
     expect(inputs.plans.starter.aiUtilization).toBeCloseTo(15 / 150, 6);
     // Pro: 40 mensagens em 2 lojas = 20 por loja, de uma cota de 500.
     expect(inputs.plans.premium.aiUtilization).toBeCloseTo(20 / 500, 6);
-    // Plano com lojas e nenhuma mensagem: uso real é zero.
-    expect(inputs.plans.business.aiUtilization).toBe(0);
     expect(inputs.ai.realAverage).toEqual({ in: 10_000, out: 200 });
     expect(inputs.ai.voiceShare).toBeCloseTo(0.3, 6);
   });

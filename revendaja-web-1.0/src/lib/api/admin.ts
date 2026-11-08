@@ -4,7 +4,7 @@ import { buildQuery } from '../utils/dates';
 // Painel de administração (rotas /admin do backend, só para contas com papel `admin`). As datas
 // chegam como texto ISO.
 
-export type AdminPlanId = 'free' | 'starter' | 'premium' | 'business';
+export type AdminPlanId = 'free' | 'starter' | 'premium';
 
 export type AiTotals = {
   messages: number;

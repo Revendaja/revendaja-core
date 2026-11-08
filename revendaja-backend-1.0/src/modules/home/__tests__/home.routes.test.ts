@@ -68,10 +68,7 @@ function buildUserRow(overrides: Record<string, unknown> = {}) {
 
 // A mesma tabela `stores` é lida de dois jeitos: a loja da usuária (where.userId) e só a
 // meta + plano (where.id + select).
-function arrangeStore(
-  monthlyGoal: number | null,
-  plan: 'free' | 'starter' | 'premium' | 'business' = 'free',
-) {
+function arrangeStore(monthlyGoal: number | null, plan: 'free' | 'starter' | 'premium' = 'free') {
   userFindUnique.mockResolvedValue(buildUserRow());
   storeFindUnique.mockImplementation(({ where }: { where: { userId?: string } }) =>
     Promise.resolve(

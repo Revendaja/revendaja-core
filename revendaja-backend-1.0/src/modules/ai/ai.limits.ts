@@ -12,10 +12,10 @@ export interface AiPlanLimits {
 }
 
 export const AI_PLAN_LIMITS: Record<StorePlan, AiPlanLimits> = {
+  // Gratuito: poucas mensagens, só para a usuária experimentar o assistente e querer assinar.
   free: { messagesPerMonth: 15, transcriptionsPerMonth: 15 },
   starter: { messagesPerMonth: 150, transcriptionsPerMonth: 150 },
   premium: { messagesPerMonth: 500, transcriptionsPerMonth: 500 },
-  business: { messagesPerMonth: 1500, transcriptionsPerMonth: 1500 },
 };
 
 // Tamanho de uma mensagem digitada (também aplicado no campo do app).

@@ -104,7 +104,7 @@ export const storeInfoTool = defineReadTool({
 export const planFeaturesTool = defineReadTool({
   name: 'get_plan_features',
   description:
-    'O que cada plano (Gratuito, Inicial, Pro, Empresarial) libera: limite de produtos, produto manual e kits, categorias, promoções e mensagens do assistente por mês. Indica qual é o plano atual. Use para "o que meu plano inclui", "vale a pena fazer upgrade". A troca de plano é feita na tela Planos do app.',
+    'O que cada plano (Gratuito, Inicial, Pro) libera: limite de produtos, produto manual e kits, categorias, promoções, relatórios (mais vendidos; parados e marcas) e mensagens do assistente por mês. Indica qual é o plano atual. Use para "o que meu plano inclui", "vale a pena fazer upgrade". A troca de plano é feita na tela Planos do app.',
   input: z.object({}),
   async run(ctx) {
     const store = await getStoreOrThrow(ctx.userId);
@@ -116,6 +116,8 @@ export const planFeaturesTool = defineReadTool({
       manualProductsAndKits: STORE_PLAN_LIMITS[id].manualProductsEnabled,
       categories: STORE_PLAN_LIMITS[id].categoriesEnabled,
       promotions: STORE_PLAN_LIMITS[id].promotionsEnabled,
+      topProductsReport: STORE_PLAN_LIMITS[id].topProductsReportEnabled,
+      staleAndBrandsReports: STORE_PLAN_LIMITS[id].advancedReportsEnabled,
       assistantMessagesPerMonth: AI_PLAN_LIMITS[id].messagesPerMonth,
     }));
     return { data: { currentPlan: STORE_PLAN_NAMES[store.plan], plans } };

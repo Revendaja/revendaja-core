@@ -94,7 +94,7 @@ export const adminRepository = {
       prisma.store.count({ where: { createdAt: { gte: since30 } } }),
       prisma.store.groupBy({ by: ['plan'], _count: { _all: true } }),
     ]);
-    const plans = { free: 0, starter: 0, premium: 0, business: 0 } as Record<string, number>;
+    const plans = { free: 0, starter: 0, premium: 0 } as Record<string, number>;
     for (const row of byPlan) plans[row.plan] = row._count._all;
     return { total, online, new7d, new30d, byPlan: plans };
   },

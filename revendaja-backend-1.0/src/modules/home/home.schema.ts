@@ -19,7 +19,7 @@ export const homeQuerySchema = z
 
 export const homeResponseSchema = z.object({
   plan: z.object({
-    id: z.enum(['free', 'starter', 'premium', 'business']),
+    id: z.enum(['free', 'starter', 'premium']),
     name: z.string(),
   }),
   revenue: z.object({

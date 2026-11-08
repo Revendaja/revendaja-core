@@ -13,6 +13,7 @@ export const queryKeys = {
   salesStaleProducts: (days: number) => ['sales', 'stale-products', days] as const,
   storePlan: () => ['store', 'plan'] as const,
   billing: () => ['billing'] as const,
+  aiUsage: () => ['ai', 'usage'] as const,
   storefrontCustomization: () => ['store', 'storefront'] as const,
   storeStats: () => ['store', 'stats'] as const,
   storeSettings: () => ['store', 'settings'] as const,

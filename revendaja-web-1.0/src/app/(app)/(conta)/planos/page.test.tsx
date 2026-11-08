@@ -46,15 +46,14 @@ describe('Planos', () => {
       mocks.getBilling.mockResolvedValue(billingOverview({ planId: 'free' }));
     });
 
-    it('lista os 4 planos com os preços e marca o atual', async () => {
+    it('lista os 3 planos com os preços e marca o atual', async () => {
       await renderLoaded();
 
-      for (const name of ['Gratuito', 'Inicial', 'Pro', 'Empresarial']) {
+      for (const name of ['Gratuito', 'Inicial', 'Pro']) {
         expect(screen.getByRole('heading', { name })).toBeInTheDocument();
       }
       expect(within(card('Inicial')).getByText('R$ 29,99')).toBeInTheDocument();
       expect(within(card('Pro')).getByText('R$ 49,99')).toBeInTheDocument();
-      expect(within(card('Empresarial')).getByText('R$ 129,99')).toBeInTheDocument();
       // Selo no topo e botão desabilitado no rodapé.
       expect(within(card('Gratuito')).getAllByText('Plano atual')).toHaveLength(2);
       expect(within(card('Pro')).queryByText('Plano atual')).not.toBeInTheDocument();

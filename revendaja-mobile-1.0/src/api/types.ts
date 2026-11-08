@@ -195,7 +195,7 @@ export type SalesSummary = {
 
 // Toda loja começa no Gratuito. Mesmos ids do `PlanId` de src/types (usado no catálogo de exemplo
 // da tela Planos), mas este aqui é o valor real que vem da API.
-export type StorePlanId = 'free' | 'starter' | 'premium' | 'business';
+export type StorePlanId = 'free' | 'starter' | 'premium';
 
 export type LowStockProduct = {
   // UUID do produto da loja (o mesmo de ProductDetail).

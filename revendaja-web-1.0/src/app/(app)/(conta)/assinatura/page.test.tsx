@@ -84,10 +84,18 @@ describe('Assinatura', () => {
       expect(within(rows[2]).getByRole('link', { name: 'Ver' })).toHaveAttribute('href', 'https://stripe.test/in_2');
     });
 
-    it('os botões de troca levam para a página de planos', async () => {
+    it('no plano mais alto só há o botão de trocar de plano (sem "Fazer upgrade")', async () => {
       await renderLoaded();
 
       expect(screen.getByRole('link', { name: 'Trocar plano' })).toHaveAttribute('href', '/planos');
+      expect(screen.queryByRole('link', { name: 'Fazer upgrade' })).not.toBeInTheDocument();
+    });
+
+    it('no Inicial, o botão "Fazer upgrade" leva para a página de planos', async () => {
+      mocks.getBilling.mockResolvedValue(billingOverview({ planId: 'starter' }));
+      mocks.getStorePlan.mockResolvedValue(planUsage(10, 'starter'));
+      await renderLoaded('Inicial');
+
       expect(screen.getByRole('link', { name: 'Fazer upgrade' })).toHaveAttribute('href', '/planos');
     });
   });

@@ -14,7 +14,7 @@ export const notifyAllSchema = z.object({
 });
 
 export const notifyPlanSchema = z.object({
-  plan: z.enum(['free', 'starter', 'premium', 'business']),
+  plan: z.enum(['free', 'starter', 'premium']),
   title: titleSchema,
   message: messageSchema,
   type: notificationTypeSchema.default('SYSTEM'),

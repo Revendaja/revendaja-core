@@ -45,7 +45,7 @@ const STATS_WINDOW_DAYS = 7;
 const HOME_SECTION_SIZE = 8;
 const HOME_CATEGORIES_MAX = 12;
 // Planos que tiram a marca do Revendajá do rodapé da vitrine.
-const WHITE_LABEL_PLANS: readonly string[] = ['premium', 'business'];
+const WHITE_LABEL_PLANS: readonly string[] = ['premium'];
 const HOUR_MS = 60 * 60 * 1000;
 const DAY_MS = 24 * HOUR_MS;
 

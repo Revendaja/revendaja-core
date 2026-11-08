@@ -71,7 +71,7 @@ export function cancelAiAction(id: string) {
 }
 
 export type AiUsage = {
-  plan: { id: 'free' | 'starter' | 'premium' | 'business'; name: string };
+  plan: { id: 'free' | 'starter' | 'premium'; name: string };
   messages: { used: number; limit: number; remaining: number };
   // Quando o limite volta a zerar (início do próximo mês).
   resetsAt: string;

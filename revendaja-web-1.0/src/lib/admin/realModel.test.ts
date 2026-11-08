@@ -15,7 +15,7 @@ function overview(overrides: Partial<AdminOverview> = {}): AdminOverview {
       new30d: 0,
       active30d: 0,
       paying: 3,
-      byPlan: { free: 1, starter: 2, premium: 1, business: 0 },
+      byPlan: { free: 1, starter: 2, premium: 1 },
     },
     subscriptions: { byStatus: {}, cancelAtPeriodEnd: 0, renewingIn7d: 0 },
     gmv: {
