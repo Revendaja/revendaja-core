@@ -9,10 +9,21 @@
       "distribution": "internal"
     },
     "preview": {
-      "distribution": "internal"
+      "distribution": "internal",
+      "env": {
+        "EXPO_PUBLIC_API_URL": "https://revendaja-core.fly.dev",
+        "EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID": "12780161978-vtatu0fjp0b7s43cdfmecqqjm6vun0bl.apps.googleusercontent.com"
+      }
     },
     "production": {
-      "autoIncrement": true
+      "autoIncrement": true,
+      "android": {
+        "buildType": "app-bundle"
+      },
+      "env": {
+        "EXPO_PUBLIC_API_URL": "https://revendaja-core.fly.dev",
+        "EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID": "12780161978-vtatu0fjp0b7s43cdfmecqqjm6vun0bl.apps.googleusercontent.com"
+      }
     }
   },
   "submit": {

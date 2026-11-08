@@ -1,0 +1,7 @@
+Primeira versão do RevendaJá!
+• Cadastre seus produtos escaneando o código de barras
+• Registre vendas e acompanhe o estoque
+• Veja relatórios de vendas e lucro
+• Tenha sua loja online com link próprio
+• Receba avisos de estoque baixo
+• Converse com o assistente para tirar dúvidas e agilizar o dia a dia
