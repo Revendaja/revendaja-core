@@ -82,3 +82,7 @@ desktop.ini
 
 # ---------- Claude Code (config local) ----------
 .claude/settings.local.json
+
+# Dumps de banco e listas de migração (dados reais de usuárias)
+*.dump
+revendaja-backend-1.0/prisma/leal-*.csv
