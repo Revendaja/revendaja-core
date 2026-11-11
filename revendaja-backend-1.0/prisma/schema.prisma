@@ -11,6 +11,15 @@ enum Role {
   admin
 }
 
+/// Tipo de conta. `standard` é cliente real. `store_review` (revisores da Play Store/App Store) e
+/// `internal` (equipe/dona do Revendaja) funcionam normalmente, mas ficam FORA das métricas e do
+/// faturamento do painel admin. Definido só manualmente (banco/seed), como o `role`.
+enum AccountType {
+  standard
+  store_review
+  internal
+}
+
 model User {
   id   String @id @default(uuid())
   name String
@@ -27,6 +36,7 @@ model User {
   // Papel de acesso. Toda conta nasce `user`; virar `admin` é uma operação manual
   // (banco/seed), não existe rota para isso — evita criar uma superfície de ataque nova.
   role            Role      @default(user)
+  accountType     AccountType @default(standard) @map("account_type")
   createdAt       DateTime  @default(now()) @map("created_at")
 
   otpCodes           OtpCode[]

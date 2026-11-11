@@ -11,6 +11,13 @@ const TZ = 'America/Sao_Paulo';
 type Num = bigint | number | string | Prisma.Decimal | null;
 const n = (value: Num): number => (value === null ? 0 : Number(value));
 
+// Só contas de cliente real entram nas métricas: revisores das lojas de app (`store_review`) e contas
+// internas (`internal`) ficam de fora de contagens, faturamento e consumo de IA.
+const REAL_USER = Prisma.sql`u.account_type = 'standard'`;
+const REAL_STORE_IDS = Prisma.sql`(SELECT s.id FROM stores s JOIN users u ON u.id = s.user_id WHERE ${REAL_USER})`;
+const REAL_USER_WHERE = { accountType: 'standard' } as const;
+const REAL_STORE_WHERE = { user: REAL_USER_WHERE } as const;
+
 export interface WeekPoint {
   weekStart: Date;
   newUsers: number;
@@ -79,21 +86,21 @@ export interface AiStoreRow {
 export const adminRepository = {
   async userCounts(since7: Date, since30: Date) {
     const [total, verified, new7d, new30d] = await Promise.all([
-      prisma.user.count(),
-      prisma.user.count({ where: { phoneVerifiedAt: { not: null } } }),
-      prisma.user.count({ where: { createdAt: { gte: since7 } } }),
-      prisma.user.count({ where: { createdAt: { gte: since30 } } }),
+      prisma.user.count({ where: REAL_USER_WHERE }),
+      prisma.user.count({ where: { ...REAL_USER_WHERE, phoneVerifiedAt: { not: null } } }),
+      prisma.user.count({ where: { ...REAL_USER_WHERE, createdAt: { gte: since7 } } }),
+      prisma.user.count({ where: { ...REAL_USER_WHERE, createdAt: { gte: since30 } } }),
     ]);
     return { total, verified, new7d, new30d };
   },
 
   async storeCounts(since7: Date, since30: Date) {
     const [total, online, new7d, new30d, byPlan] = await Promise.all([
-      prisma.store.count(),
-      prisma.store.count({ where: { isOnline: true } }),
-      prisma.store.count({ where: { createdAt: { gte: since7 } } }),
-      prisma.store.count({ where: { createdAt: { gte: since30 } } }),
-      prisma.store.groupBy({ by: ['plan'], _count: { _all: true } }),
+      prisma.store.count({ where: REAL_STORE_WHERE }),
+      prisma.store.count({ where: { ...REAL_STORE_WHERE, isOnline: true } }),
+      prisma.store.count({ where: { ...REAL_STORE_WHERE, createdAt: { gte: since7 } } }),
+      prisma.store.count({ where: { ...REAL_STORE_WHERE, createdAt: { gte: since30 } } }),
+      prisma.store.groupBy({ by: ['plan'], where: REAL_STORE_WHERE, _count: { _all: true } }),
     ]);
     const plans = { free: 0, starter: 0, premium: 0 } as Record<string, number>;
     for (const row of byPlan) plans[row.plan] = row._count._all;
@@ -102,10 +109,18 @@ export const adminRepository = {
 
   async subscriptions(now: Date, in7d: Date) {
     const [byStatus, cancelAtPeriodEnd, renewingIn7d] = await Promise.all([
-      prisma.store.groupBy({ by: ['subscriptionStatus'], _count: { _all: true } }),
-      prisma.store.count({ where: { cancelAtPeriodEnd: true } }),
+      prisma.store.groupBy({
+        by: ['subscriptionStatus'],
+        where: REAL_STORE_WHERE,
+        _count: { _all: true },
+      }),
+      prisma.store.count({ where: { ...REAL_STORE_WHERE, cancelAtPeriodEnd: true } }),
       prisma.store.count({
-        where: { currentPeriodEnd: { gte: now, lte: in7d }, cancelAtPeriodEnd: false },
+        where: {
+          ...REAL_STORE_WHERE,
+          currentPeriodEnd: { gte: now, lte: in7d },
+          cancelAtPeriodEnd: false,
+        },
       }),
     ]);
     const status: Record<string, number> = {};
@@ -124,6 +139,7 @@ export const adminRepository = {
         COUNT(DISTINCT store_id) FILTER (WHERE status <> 'cancelled') AS stores
       FROM sales
       WHERE created_at >= ${from} AND created_at < ${to}
+        AND store_id IN ${REAL_STORE_IDS}
     `;
     return {
       gross: n(row.gross),
@@ -138,13 +154,14 @@ export const adminRepository = {
     const [users, stores, sales] = await Promise.all([
       prisma.$queryRaw<{ week: Date; c: Num }[]>`
         SELECT date_trunc('week', created_at AT TIME ZONE ${TZ}) AS week, COUNT(*) AS c
-        FROM users WHERE created_at >= ${since} GROUP BY 1`,
+        FROM users u WHERE created_at >= ${since} AND ${REAL_USER} GROUP BY 1`,
       prisma.$queryRaw<{ week: Date; c: Num }[]>`
         SELECT date_trunc('week', created_at AT TIME ZONE ${TZ}) AS week, COUNT(*) AS c
-        FROM stores WHERE created_at >= ${since} GROUP BY 1`,
+        FROM stores WHERE created_at >= ${since} AND id IN ${REAL_STORE_IDS} GROUP BY 1`,
       prisma.$queryRaw<{ week: Date; g: Num }[]>`
         SELECT date_trunc('week', created_at AT TIME ZONE ${TZ}) AS week, SUM(total) AS g
-        FROM sales WHERE created_at >= ${since} AND status = 'paid' GROUP BY 1`,
+        FROM sales WHERE created_at >= ${since} AND status = 'paid'
+          AND store_id IN ${REAL_STORE_IDS} GROUP BY 1`,
     ]);
     const map = new Map<number, WeekPoint>();
     const point = (week: Date) => {
@@ -180,7 +197,7 @@ export const adminRepository = {
 
   async aiTotals(period: string): Promise<AiTotals> {
     const result = await prisma.aiUsage.aggregate({
-      where: { period },
+      where: { period, store: REAL_STORE_WHERE },
       _sum: { messages: true, transcriptions: true, inputTokens: true, outputTokens: true },
       _count: { _all: true },
     });
@@ -197,6 +214,7 @@ export const adminRepository = {
   async aiHistory(limit: number) {
     const rows = await prisma.aiUsage.groupBy({
       by: ['period'],
+      where: { store: REAL_STORE_WHERE },
       _sum: { messages: true, transcriptions: true, inputTokens: true, outputTokens: true },
       _count: { _all: true },
       orderBy: { period: 'desc' },
@@ -232,7 +250,8 @@ export const adminRepository = {
         COALESCE(SUM(au.output_tokens), 0) AS output_tokens
       FROM ai_usage au
       JOIN stores s ON s.id = au.store_id
-      WHERE au.period = ${period}
+      JOIN users u ON u.id = s.user_id
+      WHERE au.period = ${period} AND ${REAL_USER}
       GROUP BY s.plan
     `;
     return rows.map((row) => ({
@@ -247,7 +266,7 @@ export const adminRepository = {
 
   async aiByStore(period: string, limit: number): Promise<AiStoreRow[]> {
     const rows = await prisma.aiUsage.findMany({
-      where: { period },
+      where: { period, store: REAL_STORE_WHERE },
       orderBy: [{ outputTokens: 'desc' }, { messages: 'desc' }],
       take: limit,
       include: { store: { select: { storeName: true, plan: true } } },
