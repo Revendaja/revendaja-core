@@ -2,8 +2,12 @@ import type { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify';
 import type { ZodTypeProvider } from '@fastify/type-provider-zod';
 import { authenticate } from '../../shared/middlewares/authenticate';
 import { requireAdmin } from '../../shared/middlewares/requireAdmin';
-import { adminAiQuerySchema, adminStoresQuerySchema } from './admin.schema';
-import type { AdminAiQuery, AdminStoresQuery } from './admin.schema';
+import {
+  adminAiQuerySchema,
+  adminCreateCatalogProductSchema,
+  adminStoresQuerySchema,
+} from './admin.schema';
+import type { AdminAiQuery, AdminCreateCatalogProduct, AdminStoresQuery } from './admin.schema';
 import { adminService } from './admin.service';
 
 // Painel da administradora. Todas as rotas exigem login e o papel `admin` (conferido no banco a cada
@@ -98,5 +102,20 @@ export async function adminRoutes(app: FastifyInstance): Promise<void> {
     },
     async (_request: FastifyRequest, reply: FastifyReply) =>
       reply.send(await adminService.system()),
+  );
+
+  server.post(
+    '/admin/catalog/products',
+    {
+      preHandler,
+      schema: {
+        ...base,
+        summary:
+          'Cadastra um produto no catálogo global. A foto é enviada antes em /admin/uploads/catalog-image.',
+        body: adminCreateCatalogProductSchema,
+      },
+    },
+    async (request: FastifyRequest<{ Body: AdminCreateCatalogProduct }>, reply: FastifyReply) =>
+      reply.status(201).send(await adminService.createCatalogProduct(request.body)),
   );
 }

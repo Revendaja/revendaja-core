@@ -11,6 +11,7 @@ import { Icon, type IconName } from '@/components/dashboard/icons';
 const NAV: { label: string; href: string; icon: IconName }[] = [
   { label: 'Visão geral', href: '/admin', icon: 'grid' },
   { label: 'Lojas e clientes', href: '/admin/lojas', icon: 'store' },
+  { label: 'Catálogo', href: '/admin/catalogo', icon: 'catalog' },
   { label: 'Assistente de IA', href: '/admin/ia', icon: 'sparkle' },
   { label: 'Custos e planos', href: '/admin/custos', icon: 'chartLine' },
   { label: 'Desempenho', href: '/admin/desempenho', icon: 'chart' },

@@ -15,7 +15,8 @@ const HIGHLIGHTS = [
   { title: 'Catálogo no WhatsApp', text: 'Sua vitrine online pronta para mandar para as clientes.' },
 ];
 
-export function Hero() {
+// appHref: destino do app para quem já está logado (null para visitantes).
+export function Hero({ appHref = null }: { appHref?: string | null }) {
   return (
     <section className="relative isolate flex min-h-screen flex-col overflow-hidden bg-black text-white">
       <div className="absolute inset-y-0 -right-[4%] left-0 -z-20 lg:left-[14%] lg:[mask-image:linear-gradient(to_right,transparent,black_25%)]">
@@ -39,15 +40,26 @@ export function Hero() {
         </nav>
 
         <div className="flex items-center gap-3">
-          <Link href="/login" className="text-sm font-semibold text-white/90 hover:text-white">
-            Entrar
-          </Link>
-          <Link
-            href="/register"
-            className="rounded-full bg-primary-500 px-5 py-2 text-sm font-bold text-white transition-all hover:-translate-y-0.5 hover:bg-primary-600 hover:shadow-lg hover:shadow-primary-500/30 active:translate-y-0"
-          >
-            Começar agora
-          </Link>
+          {appHref ? (
+            <Link
+              href={appHref}
+              className="rounded-full bg-primary-500 px-5 py-2 text-sm font-bold text-white transition-all hover:-translate-y-0.5 hover:bg-primary-600 hover:shadow-lg hover:shadow-primary-500/30 active:translate-y-0"
+            >
+              Ir para o painel
+            </Link>
+          ) : (
+            <>
+              <Link href="/login" className="text-sm font-semibold text-white/90 hover:text-white">
+                Entrar
+              </Link>
+              <Link
+                href="/register"
+                className="rounded-full bg-primary-500 px-5 py-2 text-sm font-bold text-white transition-all hover:-translate-y-0.5 hover:bg-primary-600 hover:shadow-lg hover:shadow-primary-500/30 active:translate-y-0"
+              >
+                Começar agora
+              </Link>
+            </>
+          )}
         </div>
       </header>
 
@@ -64,10 +76,10 @@ export function Hero() {
             </p>
             <div className="flex flex-wrap gap-3">
               <Link
-                href="/register"
+                href={appHref ?? '/register'}
                 className="rounded-full bg-primary-500 px-6 py-3 text-sm font-bold text-white transition-all hover:-translate-y-0.5 hover:bg-primary-600 hover:shadow-lg hover:shadow-primary-500/30 active:translate-y-0"
               >
-                Começar agora
+                {appHref ? 'Ir para o painel' : 'Começar agora'}
               </Link>
               <a
                 href="#funcionalidades"

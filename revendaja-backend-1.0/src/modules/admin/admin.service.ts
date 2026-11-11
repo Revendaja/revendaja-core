@@ -6,7 +6,8 @@ import { usagePeriod } from '../ai/ai.period';
 import { STORE_PLAN_LIMITS, STORE_PLAN_NAMES } from '../store/store.plans';
 import type { StorePlan } from '../store/store.types';
 import { adminRepository } from './admin.repository';
-import type { AdminAiQuery, AdminStoresQuery } from './admin.schema';
+import { ConflictError, NotFoundError } from '../../shared/errors/AppError';
+import type { AdminAiQuery, AdminCreateCatalogProduct, AdminStoresQuery } from './admin.schema';
 
 const DAY_MS = 24 * 60 * 60 * 1000;
 const WEEKS = 12;
@@ -238,6 +239,22 @@ export class AdminService {
       queue,
       integrations,
     };
+  }
+
+  // Cadastra um produto no catálogo global (visível para todas as lojas).
+  async createCatalogProduct(input: AdminCreateCatalogProduct) {
+    if (!(await adminRepository.findBrandId(input.brandId))) {
+      throw new NotFoundError('Marca não encontrada.');
+    }
+    if (input.barCode) {
+      const existing = await adminRepository.findProductByBarCode(input.barCode);
+      if (existing) {
+        throw new ConflictError(
+          `Já existe um produto com esse código de barras: ${existing.name} (#${existing.id}).`,
+        );
+      }
+    }
+    return adminRepository.createCatalogProduct(input);
   }
 }
 

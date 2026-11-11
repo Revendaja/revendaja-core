@@ -16,6 +16,9 @@
   /* Fundo da página/sidebar (cinza neutro); o painel principal é branco por cima. */
   --color-canvas: #f4f4f5;
 
+  /* Fundo claro e quente das seções da landing (combina com o laranja da marca). */
+  --color-cream: #faf6f1;
+
   --color-ink-50: #f5f6fa;
   --color-ink-100: #e7e8f2;
   --color-ink-200: #d3d5e3;
@@ -37,6 +40,13 @@
   --radius-xl2: 20px;
 
   --font-sans: var(--font-inter), system-ui, sans-serif;
+}
+
+/* Links de âncora da landing rolam suavemente (exceto para quem prefere menos movimento). */
+@media (prefers-reduced-motion: no-preference) {
+  html {
+    scroll-behavior: smooth;
+  }
 }
 
 body {
@@ -152,23 +162,18 @@ body {
   }
 }
 
-@keyframes showcase-float {
-  0%,
-  100% {
-    transform: translateY(0);
-  }
-  50% {
-    transform: translateY(-12px);
-  }
-}
-
-.showcase-float {
-  animation: showcase-float 6s ease-in-out infinite;
-}
-
 @media (prefers-reduced-motion: reduce) {
-  .reveal,
-  .showcase-float {
+  .reveal {
     animation: none;
   }
+}
+
+/* Landing: o braço some no fundo (embaixo e à direita), sem corte seco na borda da imagem. */
+.hand-fade {
+  -webkit-mask-image: linear-gradient(to bottom, #000 58%, transparent 96%),
+    linear-gradient(to right, #000 78%, transparent 100%);
+  -webkit-mask-composite: source-in;
+  mask-image: linear-gradient(to bottom, #000 58%, transparent 96%),
+    linear-gradient(to right, #000 78%, transparent 100%);
+  mask-composite: intersect;
 }

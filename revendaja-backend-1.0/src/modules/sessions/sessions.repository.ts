@@ -1,10 +1,11 @@
 import { prisma } from '../../database/prisma';
 import type { User } from '../users/users.types';
-import type { Session } from './sessions.types';
+import type { Session, SessionClient } from './sessions.types';
 
 interface SessionWithUserRow {
   id: string;
   user_id: string;
+  client: SessionClient;
   expires_at: Date;
   created_at: Date;
   name: string;
@@ -33,7 +34,7 @@ export const sessionsRepository = {
   async findByIdWithUser(id: string): Promise<(Session & { user: User }) | null> {
     const rows = await prisma.$queryRaw<SessionWithUserRow[]>`
       SELECT
-        s.id, s.user_id, s.expires_at, s.created_at,
+        s.id, s.user_id, s.client::text AS client, s.expires_at, s.created_at,
         u.name, u.email, u.whatsapp, u.password_hash, u.google_id, u.phone_verified_at,
         u.role::text AS role, u.created_at AS user_created_at
       FROM sessions s
@@ -46,6 +47,7 @@ export const sessionsRepository = {
     return {
       id: row.id,
       userId: row.user_id,
+      client: row.client,
       expiresAt: row.expires_at,
       createdAt: row.created_at,
       user: {
@@ -62,13 +64,19 @@ export const sessionsRepository = {
     };
   },
 
-  // Cria a sessão da usuária ou SUBSTITUI a que já existe. É aqui que "uma
-  // sessão por conta" acontece: `userId` é @unique, então o upsert nunca gera
-  // duas linhas, e o `id` novo invalida todos os tokens emitidos antes.
-  replaceForUser(userId: string, sessionId: string, expiresAt: Date): Promise<Session> {
+  // Cria a sessão da usuária ou SUBSTITUI a que já existe PARA O MESMO TIPO DE APARELHO. É aqui
+  // que "uma sessão por aparelho (web / mobile)" acontece: `(userId, client)` é único, então o
+  // upsert nunca gera duas linhas do mesmo tipo, e o `id` novo invalida todos os tokens anteriores
+  // daquele tipo. A sessão do outro tipo não é tocada.
+  replaceForUser(
+    userId: string,
+    sessionId: string,
+    expiresAt: Date,
+    client: SessionClient = 'mobile',
+  ): Promise<Session> {
     return prisma.session.upsert({
-      where: { userId },
-      create: { id: sessionId, userId, expiresAt },
+      where: { userId_client: { userId, client } },
+      create: { id: sessionId, userId, client, expiresAt },
       update: { id: sessionId, expiresAt, createdAt: new Date() },
     });
   },

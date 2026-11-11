@@ -25,6 +25,8 @@ describe('SessionService', () => {
       expect(repository.replaceForUser).toHaveBeenCalledTimes(1);
       const [userId, sessionId] = repository.replaceForUser.mock.calls[0];
       expect(userId).toBe('user-1');
+      // Sem informar o tipo de aparelho, a sessão é "mobile".
+      expect(repository.replaceForUser.mock.calls[0][3]).toBe('mobile');
 
       const access = jwt.verify(accessToken, process.env.JWT_SECRET as string) as jwt.JwtPayload;
       const refresh = jwt.verify(
@@ -63,11 +65,20 @@ describe('SessionService', () => {
     });
   });
 
+  it('start com client "web" grava a sessão do navegador (a do mobile não é tocada)', async () => {
+    const repository = createSessionsRepositoryMock();
+    await new SessionService(repository).start('user-1', 'web');
+
+    expect(repository.replaceForUser.mock.calls[0][3]).toBe('web');
+    expect(repository.deleteByUserId).not.toHaveBeenCalled();
+  });
+
   describe('refresh', () => {
     function buildSession(overrides: Partial<Session> = {}): Session {
       return {
         id: 'session-1',
         userId: 'user-1',
+        client: 'mobile',
         expiresAt: new Date(Date.now() + 60 * 60_000),
         createdAt: new Date(),
         ...overrides,

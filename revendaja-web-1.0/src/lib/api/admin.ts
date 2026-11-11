@@ -1,5 +1,7 @@
 import { request } from './http';
 import { buildQuery } from '../utils/dates';
+import { uploadImage } from './storeProducts';
+import type { CatalogProduct } from './types';
 
 // Painel de administração (rotas /admin do backend, só para contas com papel `admin`). As datas
 // chegam como texto ISO.
@@ -183,4 +185,23 @@ export function getAdminSystem() {
 
 export function getAdminLatency() {
   return request<AdminLatency>('/admin/latency', { auth: true });
+}
+
+export type NewCatalogProduct = {
+  name: string;
+  brandId: number;
+  barCode?: string;
+  brandSku?: string;
+  description?: string;
+  basePrice: number;
+  productImage?: string;
+};
+
+// Foto do produto do catálogo: vai para o S3 (pasta catalog/products) e volta a URL pública.
+export function uploadCatalogImage(file: File) {
+  return uploadImage('/admin/uploads/catalog-image', file);
+}
+
+export function createCatalogProduct(input: NewCatalogProduct) {
+  return request<CatalogProduct>('/admin/catalog/products', { method: 'POST', body: input, auth: true });
 }

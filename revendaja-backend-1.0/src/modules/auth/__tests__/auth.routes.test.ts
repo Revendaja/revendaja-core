@@ -171,9 +171,11 @@ describe('POST /auth/login', () => {
     expect(body.isVerified).toBe(true);
     expect(body.hasStore).toBe(true);
 
-    // Sessão única: o login grava/substitui a sessão da usuária (upsert por userId).
+    // O login grava/substitui a sessão da usuária para o tipo de aparelho (sem Origin = mobile).
     expect(sessionUpsert).toHaveBeenCalledTimes(1);
-    expect(sessionUpsert.mock.calls[0][0].where).toEqual({ userId: USER_ID });
+    expect(sessionUpsert.mock.calls[0][0].where).toEqual({
+      userId_client: { userId: USER_ID, client: 'mobile' },
+    });
 
     await app.close();
   });

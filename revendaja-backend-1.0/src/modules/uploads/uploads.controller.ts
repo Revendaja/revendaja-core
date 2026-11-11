@@ -15,7 +15,13 @@ function isAllowedImageMimeType(value: string): value is AllowedImageMimeType {
 
 // Usada pela imagem de um produto manual (ex.: o ursinho, a cesta). O app manda a imagem por aqui
 // em vez de falar com a AWS diretamente: as credenciais do S3 ficam só no servidor.
-async function handleImageUpload(request: FastifyRequest, reply: FastifyReply, folder: string) {
+async function handleImageUpload(
+  request: FastifyRequest,
+  reply: FastifyReply,
+  folder: string,
+  // Pasta completa no bucket. Padrão: dentro da pasta do usuário (apagada junto com a conta dele).
+  fullFolder: string = `users/${request.userId}/${folder}`,
+) {
   if (!request.isMultipart()) {
     throw new AppError('Envie a imagem como multipart/form-data.', 400, 'INVALID_UPLOAD');
   }
@@ -58,7 +64,7 @@ async function handleImageUpload(request: FastifyRequest, reply: FastifyReply, f
   const { url } = await imageUploadProvider.upload({
     buffer,
     contentType: detectedType,
-    folder: `users/${request.userId}/${folder}`,
+    folder: fullFolder,
   });
 
   return reply.send({ url });
@@ -76,4 +82,10 @@ export function uploadStoreLogo(request: FastifyRequest, reply: FastifyReply) {
 // Banners da vitrine (topo, ofertas e coleções): mesma validação, outra pasta no bucket.
 export function uploadStoreBanner(request: FastifyRequest, reply: FastifyReply) {
   return handleImageUpload(request, reply, 'banners');
+}
+
+// Foto de produto do catálogo global (só admin). Fica fora de `users/<id>/`: é do catálogo, não de
+// uma conta, então não pode ser apagada junto com a exclusão de conta de quem cadastrou.
+export function uploadCatalogImage(request: FastifyRequest, reply: FastifyReply) {
+  return handleImageUpload(request, reply, 'products', 'catalog/products');
 }

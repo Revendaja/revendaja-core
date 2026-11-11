@@ -79,6 +79,15 @@ export function StorefrontView({ initial, home }: { initial: Storefront; home: S
   // Atalho de categoria/marca escolhido (null = todos os produtos).
   const [filter, setFilter] = useState<StorefrontFilter>(null);
 
+  // Link de categoria (ex.: compartilhado pelo app): `?categoria=<id>` abre a vitrine já filtrada.
+  useEffect(() => {
+    const id = new URLSearchParams(window.location.search).get('categoria');
+    if (!id || !/^[0-9a-f-]{36}$/i.test(id)) return;
+    setFilter({ type: 'category', id });
+    const timer = window.setTimeout(() => scrollToSection(SECTION_IDS.catalog), 300);
+    return () => window.clearTimeout(timer);
+  }, []);
+
   const [cart, setCart] = useState<CartLine[]>([]);
   const [cartOpen, setCartOpen] = useState(false);
   const [receipt, setReceipt] = useState<OnlineOrderReceipt | null>(null);

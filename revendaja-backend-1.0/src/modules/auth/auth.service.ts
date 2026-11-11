@@ -6,6 +6,7 @@ import type { User } from '../users/users.types';
 import { storeRepository, type StoreRepository } from '../store/store.repository';
 import { otpService, type OtpService } from '../otp/otp.service';
 import { sessionService, type SessionService } from '../sessions/sessions.service';
+import type { SessionClient } from '../sessions/sessions.types';
 import { verifyGoogleIdToken } from './google';
 import type { LoginInput, RegisterInput, UpdateProfileInput } from './auth.schema';
 
@@ -23,7 +24,7 @@ export class AuthService {
     private readonly sessions: SessionService = sessionService,
   ) {}
 
-  async register(input: RegisterInput) {
+  async register(input: RegisterInput, client?: SessionClient) {
     const [existingEmail, existingWhatsapp] = await Promise.all([
       this.users.findByEmail(input.email),
       this.users.findByWhatsapp(input.whatsapp),
@@ -61,14 +62,14 @@ export class AuthService {
 
     return {
       user: toPublicUser(user),
-      ...(await this.sessions.start(user.id)),
+      ...(await this.sessions.start(user.id, client)),
       isVerified: false,
       hasStore: false,
       needsWhatsapp: false,
     };
   }
 
-  async login(input: LoginInput) {
+  async login(input: LoginInput, client?: SessionClient) {
     const user = await this.users.findByEmail(input.email);
     // `passwordHash` nulo = conta criada via Google que nunca definiu senha própria. Mesma
     // mensagem do e-mail/senha errados — não revela pra quem tenta adivinhar que o e-mail existe.
@@ -83,10 +84,10 @@ export class AuthService {
 
     const store = await this.stores.findByUserId(user.id);
 
-    // Sessão única: este login derruba a sessão que a usuária tinha em outro aparelho.
+    // Este login derruba a sessão que a usuária tinha em outro aparelho do mesmo tipo (web/mobile).
     return {
       user: toPublicUser(user),
-      ...(await this.sessions.start(user.id)),
+      ...(await this.sessions.start(user.id, client)),
       isVerified: user.phoneVerifiedAt !== null,
       hasStore: store !== null,
       needsWhatsapp: user.whatsapp === null,
@@ -96,7 +97,7 @@ export class AuthService {
   // Login/cadastro via Google: o ID token já prova a posse do e-mail (verificado pelo próprio
   // Google), então a conta nasce sem senha e já verificada — só falta o WhatsApp, que o app pede
   // depois (ver `needsWhatsapp`).
-  async loginWithGoogle(idToken: string) {
+  async loginWithGoogle(idToken: string, client?: SessionClient) {
     const profile = await verifyGoogleIdToken(idToken);
 
     let user = await this.users.findByGoogleId(profile.googleId);
@@ -130,7 +131,7 @@ export class AuthService {
 
     return {
       user: toPublicUser(user),
-      ...(await this.sessions.start(user.id)),
+      ...(await this.sessions.start(user.id, client)),
       isVerified: user.phoneVerifiedAt !== null,
       hasStore: store !== null,
       needsWhatsapp: user.whatsapp === null,

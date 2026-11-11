@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { View, Text, FlatList, Pressable, TextInput, Alert, Share } from 'react-native';
+import { View, Text, FlatList, Pressable, TextInput, Alert, Share, ActivityIndicator } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { useQuery } from '@tanstack/react-query';
@@ -12,6 +12,7 @@ import { EmptyState, ErrorState, ListFooter } from '../../components/ListStates'
 import { ProductCardSkeleton, SkeletonRows } from '../../components/Skeleton';
 import { getErrorMessage, isApiError } from '../../api/errors';
 import { queryKeys } from '../../api/queryKeys';
+import { listCatalogProducts } from '../../api/catalog';
 import { listStoreCategories } from '../../api/storeCategories';
 import { listStoreProducts, STORE_PRODUCTS_PAGE_SIZE } from '../../api/storeProducts';
 import type { StoreProductSort } from '../../api/storeProducts';
@@ -30,6 +31,10 @@ type Props = NativeStackScreenProps<EstoqueStackParamList, 'CatalogList'>;
 type StatusFilter = 'all' | 'active' | 'hidden';
 
 const LOW_STOCK_THRESHOLD = 20;
+
+// Código de barras: só dígitos (8 a 14), igual à Nova venda.
+const BARCODE_PATTERN = /^\d{8,14}$/;
+const stripLeadingZeros = (code: string) => code.replace(/^0+/, '');
 
 const FILTERS: { key: StatusFilter; label: string }[] = [
   { key: 'all', label: 'Todos' },
@@ -230,7 +235,8 @@ export default function CatalogScreen({ navigation }: Props) {
   const [debouncedQuery, commitQuery] = useDebouncedValue(query, SEARCH_DEBOUNCE_MS);
   const [filter, setFilter] = useState<StatusFilter>('all');
   const [scannerVisible, setScannerVisible] = useState(false);
-  const [sort, setSort] = useState<StoreProductSort>('recent');
+  const [lookingUp, setLookingUp] = useState(false);
+  const [sort,setSort] = useState<StoreProductSort>('recent');
   const [categoryId, setCategoryId] = useState<string | null>(null);
   const [sortModalVisible, setSortModalVisible] = useState(false);
   const [categoryModalVisible, setCategoryModalVisible] = useState(false);
@@ -322,6 +328,19 @@ export default function CatalogScreen({ navigation }: Props) {
   function handleShareSelected() {
     const selected = filtered.filter((item) => selectedIds.has(item.id));
     if (selected.length === 0) return;
+
+    // Categoria ativa com todos os produtos dela selecionados: em vez de colar a lista inteira, manda só o link
+    // da vitrine já filtrada nessa categoria ("Nossos perfumes masculinos: link").
+    const storeLink = authStore?.catalogLink;
+    if (categoryId && activeCategoryName && storeLink && allFilteredSelected && !isSearching && filter === 'all') {
+      const categoryLink = `${storeLink.replace(/\/+$/, '')}/?categoria=${categoryId}`;
+      const message = `Nossos ${activeCategoryName.toLowerCase()}:\n${categoryLink}`;
+      Share.share({ message }).catch(() => {
+        // Fechar/cancelar o share sheet não é erro.
+      });
+      return;
+    }
+
     const lines = selected.map((item) => {
       const price = item.isPromoActive && item.promoPrice !== null ? item.promoPrice : item.price;
       return `• ${item.product.name} - ${formatCurrency(price)}`;
@@ -333,13 +352,46 @@ export default function CatalogScreen({ navigation }: Props) {
     });
   }
 
-  // A leitura da câmera é intencional: busca já, sem esperar o debounce da digitação.
-  function handleScanned(code: string) {
-    setScannerVisible(false);
+  // Leitura da câmera / "ok" no teclado: busca já, sem esperar o debounce. Se for um código de barras que a loja
+  // não tem, procura no catálogo (mesmo fluxo da Nova venda): um único produto vai direto ao preço; vários vão
+  // para a lista de escolha; nenhum avisa que não existe.
+  async function lookupCode(code: string) {
     const value = code.trim();
     if (!value) return;
     setQuery(value);
     commitQuery(value);
+    if (!BARCODE_PATTERN.test(value)) return;
+
+    setLookingUp(true);
+    try {
+      const page = await guard(() => listStoreProducts(1, 5, value));
+      if (page.items.length > 0) return; // está na loja: a lista já mostra o resultado
+      const catalog = await guard(() => listCatalogProducts({ search: value, pageSize: 5 }));
+      const found = catalog.items.filter(
+        (item) => item.barCode && stripLeadingZeros(item.barCode) === stripLeadingZeros(value)
+      );
+      const candidate = found.length === 1 ? found[0] : catalog.items.length === 1 ? catalog.items[0] : null;
+      if (candidate) {
+        setQuery('');
+        commitQuery('');
+        navigation.navigate('QuickAddProduct', { catalogProduct: candidate });
+      } else if (catalog.items.length > 0) {
+        setQuery('');
+        commitQuery('');
+        navigation.navigate('CatalogMatches', { term: value });
+      } else {
+        Alert.alert('Produto não encontrado', `Nenhum produto da sua loja nem do catálogo tem o código ${value}.`);
+      }
+    } catch (error) {
+      Alert.alert('Ops!', getErrorMessage(error));
+    } finally {
+      setLookingUp(false);
+    }
+  }
+
+  function handleScanned(code: string) {
+    setScannerVisible(false);
+    void lookupCode(code);
   }
 
   function renderEmpty() {
@@ -465,12 +517,14 @@ export default function CatalogScreen({ navigation }: Props) {
               placeholderTextColor="#8B8FA3"
               value={query}
               onChangeText={setQuery}
+              onSubmitEditing={() => void lookupCode(query)}
               returnKeyType="search"
               accessibilityLabel="Buscar por nome ou código de barras"
               autoCorrect={false}
               className="flex-1 text-sm text-ink-900"
             />
-            {query.length > 0 && (
+            {lookingUp && <ActivityIndicator size="small" color="#FF6B00" />}
+            {query.length > 0 && !lookingUp && (
               <Pressable onPress={() => setQuery('')} hitSlop={8} accessibilityLabel="Limpar busca">
                 <Ionicons name="close-circle" size={18} color="#C7C9D9" />
               </Pressable>

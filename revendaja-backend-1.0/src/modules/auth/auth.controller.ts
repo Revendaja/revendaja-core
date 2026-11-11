@@ -1,5 +1,6 @@
 import type { FastifyReply, FastifyRequest } from 'fastify';
 import { authService } from './auth.service';
+import type { SessionClient } from '../sessions/sessions.types';
 import type {
   GoogleLoginInput,
   LoginInput,
@@ -8,16 +9,23 @@ import type {
   UpdateProfileInput,
 } from './auth.schema';
 
+// O painel web roda no navegador, que sempre manda o cabeçalho `Origin` nas chamadas à API (outro
+// domínio); o app do celular não manda. Serve só para separar as sessões (uma por tipo de aparelho),
+// não é uma barreira de segurança: quem forjar o cabeçalho só troca de "gaveta".
+function clientOf(request: FastifyRequest): SessionClient {
+  return request.headers.origin ? 'web' : 'mobile';
+}
+
 export async function register(
   request: FastifyRequest<{ Body: RegisterInput }>,
   reply: FastifyReply,
 ) {
-  const result = await authService.register(request.body);
+  const result = await authService.register(request.body, clientOf(request));
   return reply.status(201).send(result);
 }
 
 export async function login(request: FastifyRequest<{ Body: LoginInput }>, reply: FastifyReply) {
-  const result = await authService.login(request.body);
+  const result = await authService.login(request.body, clientOf(request));
   return reply.status(200).send(result);
 }
 
@@ -25,7 +33,7 @@ export async function loginWithGoogle(
   request: FastifyRequest<{ Body: GoogleLoginInput }>,
   reply: FastifyReply,
 ) {
-  const result = await authService.loginWithGoogle(request.body.idToken);
+  const result = await authService.loginWithGoogle(request.body.idToken, clientOf(request));
   return reply.status(200).send(result);
 }
 

@@ -1,5 +1,6 @@
 import { Prisma } from '@prisma/client';
 import { prisma } from '../../database/prisma';
+import { mapCatalogProduct } from '../catalog/catalog.repository';
 
 // Consultas AGREGADAS de toda a plataforma, só para o painel da administradora (`requireAdmin`).
 // Nada aqui devolve produto, venda ou cliente final: só contagens, somas e dados de contato das
@@ -385,5 +386,41 @@ export const adminRepository = {
       FROM _prisma_migrations WHERE finished_at IS NOT NULL
     `;
     return { applied: n(rows[0]?.total ?? 0), latest: rows[0]?.last ?? null };
+  },
+
+  // Catálogo global: escrita só pelo painel da administradora.
+  async findBrandId(id: number): Promise<number | null> {
+    const row = await prisma.brand.findUnique({ where: { id }, select: { id: true } });
+    return row?.id ?? null;
+  },
+
+  async findProductByBarCode(barCode: string): Promise<{ id: number; name: string } | null> {
+    return prisma.product.findFirst({ where: { barCode }, select: { id: true, name: true } });
+  },
+
+  async createCatalogProduct(data: {
+    name: string;
+    brandId: number;
+    barCode?: string;
+    brandSku?: string;
+    description?: string;
+    basePrice: number;
+    productImage?: string;
+  }) {
+    const row = await prisma.product.create({
+      data: {
+        name: data.name,
+        brandId: data.brandId,
+        barCode: data.barCode ?? null,
+        brandSku: data.brandSku ?? null,
+        description: data.description ?? null,
+        basePrice: data.basePrice,
+        productImage: data.productImage ?? null,
+        // Mesma foto nos dois tamanhos: o app usa `productImageSm` nas listas.
+        productImageSm: data.productImage ?? null,
+      },
+      include: { brand: true },
+    });
+    return mapCatalogProduct(row);
   },
 };

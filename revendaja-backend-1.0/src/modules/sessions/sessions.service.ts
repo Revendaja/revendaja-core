@@ -3,7 +3,7 @@ import jwt from 'jsonwebtoken';
 import { env } from '../../config/env';
 import { UnauthorizedError } from '../../shared/errors/AppError';
 import { sessionsRepository, type SessionsRepository } from './sessions.repository';
-import type { Session } from './sessions.types';
+import type { Session, SessionClient } from './sessions.types';
 
 export interface SessionTokens {
   accessToken: string;
@@ -21,8 +21,8 @@ export function isSessionActive(session: Session | null, userId: string): sessio
   return session !== null && session.userId === userId && session.expiresAt.getTime() > Date.now();
 }
 
-// Regra de "sessão única": iniciar uma sessão para a usuária derruba a anterior
-// (se houver). Os dois tokens carregam o id da sessão (`sid`) e o middleware
+// Regra de "uma sessão por tipo de aparelho": iniciar uma sessão derruba a anterior do MESMO tipo
+// (web ou mobile), sem afetar a do outro tipo. Os dois tokens carregam o id da sessão (`sid`) e o middleware
 // `authenticate` confere no banco que esse id ainda é a sessão vigente.
 export class SessionService {
   constructor(private readonly repository: SessionsRepository = sessionsRepository) {}
@@ -33,7 +33,7 @@ export class SessionService {
     });
   }
 
-  async start(userId: string): Promise<SessionTokens> {
+  async start(userId: string, client: SessionClient = 'mobile'): Promise<SessionTokens> {
     const sessionId = crypto.randomUUID();
 
     const refreshToken = jwt.sign({ sub: userId, sid: sessionId }, env.JWT_REFRESH_SECRET, {
@@ -44,7 +44,7 @@ export class SessionService {
     // A sessão vive tanto quanto o refresh token: lemos o `exp` dele em vez de
     // reinterpretar a string de env ("30d", "12h"...).
     const { exp } = jwt.decode(refreshToken) as { exp: number };
-    await this.repository.replaceForUser(userId, sessionId, new Date(exp * 1000));
+    await this.repository.replaceForUser(userId, sessionId, new Date(exp * 1000), client);
 
     return { accessToken, refreshToken };
   }
@@ -53,7 +53,7 @@ export class SessionService {
   // O refresh token não é rotacionado: ele segue valendo até o fim da sessão
   // (JWT_REFRESH_EXPIRES_IN depois do login), o que torna a chamada idempotente
   // — repetir por falha de rede não derruba ninguém. Se a sessão foi trocada
-  // (login em outro aparelho), apagada (logout/redefinição de senha) ou expirou,
+  // (login em outro aparelho do mesmo tipo), apagada (logout/redefinição de senha) ou expirou,
   // o refresh token deixa de servir e a usuária precisa fazer login de novo.
   async refresh(refreshToken: string): Promise<{ accessToken: string }> {
     let payload: TokenPayload;

@@ -236,7 +236,7 @@ describe('AuthService', () => {
         password: '123456',
       });
 
-      expect(sessions.start).toHaveBeenCalledWith(result.user.id);
+      expect(sessions.start).toHaveBeenCalledWith(result.user.id, undefined);
     });
 
     it('conclui o cadastro mesmo quando o envio do código por e-mail falha', async () => {
@@ -352,7 +352,7 @@ describe('AuthService', () => {
 
       const result = await service.login({ email: 'ana@email.com', password: 'senha-correta' });
 
-      expect(sessions.start).toHaveBeenCalledWith(user.id);
+      expect(sessions.start).toHaveBeenCalledWith(user.id, undefined);
       expect(result.accessToken).toBe('access-token');
     });
   });
@@ -452,7 +452,7 @@ describe('AuthService', () => {
       await service.loginWithGoogle('id-token');
 
       expect(users.findByEmail).not.toHaveBeenCalled();
-      expect(sessions.start).toHaveBeenCalledWith(user.id);
+      expect(sessions.start).toHaveBeenCalledWith(user.id, undefined);
     });
 
     it('corrida: duas primeiras tentativas criam a MESMA conta nova ao mesmo tempo: 409 ConflictError', async () => {

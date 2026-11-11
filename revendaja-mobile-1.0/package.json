@@ -48,7 +48,9 @@
     "android": "expo start --android",
     "ios": "expo start --ios",
     "web": "expo start --web",
-    "release:notes": "node scripts/play-release.mjs"
+    "release:notes": "node scripts/play-release.mjs",
+    "build:apk": "eas build -p android --profile apk",
+    "build:aab": "eas build -p android --profile production"
   },
   "private": true
 }
