@@ -405,6 +405,13 @@ export const salesRepository = {
     );
   },
 
+  // Apaga a venda (os itens vão junto, por cascata). Devolve false se ela não existe nesta loja.
+  // O estoque NÃO é mexido aqui: o service cancela antes a venda pendente, que é quem devolve estoque.
+  async remove(storeId: string, id: string): Promise<boolean> {
+    const { count } = await prisma.sale.deleteMany({ where: { id, storeId } });
+    return count === 1;
+  },
+
   // Só pendente -> paga; em venda já paga o UPDATE simplesmente não casa nenhuma
   // linha (idempotente). Devolve null se a venda não existe nesta loja.
   async markPaid(storeId: string, id: string): Promise<Sale | null> {

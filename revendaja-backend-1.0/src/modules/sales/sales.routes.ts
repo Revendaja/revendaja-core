@@ -22,6 +22,7 @@ import {
 } from './sales.schema';
 import {
   createSale,
+  deleteSale,
   getSale,
   getSalesSummary,
   getSalesTimeline,
@@ -182,5 +183,20 @@ export async function salesRoutes(app: FastifyInstance): Promise<void> {
       },
     },
     updateSaleStatus,
+  );
+
+  server.delete(
+    '/sales/:id',
+    {
+      preHandler: [authenticate, VERIFIED],
+      schema: {
+        tags: ['sales'],
+        summary:
+          'Remove uma venda. Pendente devolve o estoque reservado; paga ou cancelada só é apagada (o estoque não muda).',
+        security: [{ bearerAuth: [] }],
+        params: saleParamsSchema,
+      },
+    },
+    deleteSale,
   );
 }

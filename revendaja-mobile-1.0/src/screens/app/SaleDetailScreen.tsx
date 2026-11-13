@@ -6,7 +6,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import ProductImage from '../../components/ProductImage';
 import { ErrorState } from '../../components/ListStates';
 import { SaleDetailSkeleton } from '../../components/Skeleton';
-import { cancelSale, getSale, markSalePaid } from '../../api/sales';
+import { cancelSale, deleteSale, getSale, markSalePaid } from '../../api/sales';
 import { getErrorMessage, isApiError } from '../../api/errors';
 import { queryKeys } from '../../api/queryKeys';
 import type { SaleDetail, SaleStatusValue } from '../../api/types';
@@ -32,6 +32,7 @@ export default function SaleDetailScreen({ route, navigation }: Props) {
   const { applyStockDelta } = useStoreProducts();
   const paying = useSubmitting();
   const cancelling = useSubmitting();
+  const deleting = useSubmitting();
 
   const saleQuery = useQuery({
     queryKey: queryKeys.sales.detail(saleId),
@@ -56,6 +57,10 @@ export default function SaleDetailScreen({ route, navigation }: Props) {
   const cancelMutation = useMutation({
     mutationFn: () => guard(() => cancelSale(saleId)),
     onSuccess: invalidateAfterChange,
+  });
+
+  const deleteMutation = useMutation({
+    mutationFn: () => guard(() => deleteSale(saleId)),
   });
 
   const backButton = (
@@ -118,6 +123,39 @@ export default function SaleDetailScreen({ route, navigation }: Props) {
                   item.storeProductId ? [{ storeProductId: item.storeProductId, quantity: -item.quantity }] : []
                 )
               );
+            } catch (error) {
+              Alert.alert('Ops!', getErrorMessage(error));
+            }
+          });
+        },
+      },
+    ]);
+  }
+
+  function handleDelete() {
+    const message = isPending
+      ? 'O pedido some do histórico e o estoque reservado volta para a sua loja. Isso não pode ser desfeito.'
+      : 'A venda some do histórico e dos totais. O estoque não muda. Isso não pode ser desfeito.';
+    Alert.alert('Remover esta venda?', message, [
+      { text: 'Voltar', style: 'cancel' },
+      {
+        text: 'Remover',
+        style: 'destructive',
+        onPress: () => {
+          void deleting.run(async () => {
+            try {
+              await deleteMutation.mutateAsync();
+              if (isPending) {
+                applyStockDelta(
+                  sale.items.flatMap((item) =>
+                    item.storeProductId ? [{ storeProductId: item.storeProductId, quantity: -item.quantity }] : []
+                  )
+                );
+              }
+              queryClient.removeQueries({ queryKey: queryKeys.sales.detail(saleId) });
+              void queryClient.invalidateQueries({ queryKey: queryKeys.sales.all() });
+              void queryClient.invalidateQueries({ queryKey: queryKeys.home() });
+              navigation.goBack();
             } catch (error) {
               Alert.alert('Ops!', getErrorMessage(error));
             }
@@ -262,6 +300,23 @@ export default function SaleDetailScreen({ route, navigation }: Props) {
             )}
           </Pressable>
         )}
+
+        <Pressable
+          className="flex-row items-center justify-center gap-1.5 rounded-2xl h-12 mt-2"
+          onPress={handleDelete}
+          disabled={paying.loading || cancelling.loading || deleting.loading}
+          accessibilityRole="button"
+          style={{ opacity: paying.loading || cancelling.loading || deleting.loading ? 0.6 : 1 }}
+        >
+          {deleting.loading ? (
+            <ActivityIndicator color="#E0453F" />
+          ) : (
+            <>
+              <Ionicons name="trash-outline" size={18} color="#E0453F" />
+              <Text className="text-danger font-bold text-sm">Remover venda</Text>
+            </>
+          )}
+        </Pressable>
       </ScrollView>
     </SafeAreaView>
   );

@@ -94,3 +94,11 @@ export async function updateSaleStatus(
       : await salesService.cancel(userId, id);
   return reply.send(sale);
 }
+
+export async function deleteSale(
+  request: FastifyRequest<{ Params: SaleParams }>,
+  reply: FastifyReply,
+) {
+  await salesService.remove(request.userId as string, request.params.id);
+  return reply.status(204).send();
+}

@@ -196,6 +196,16 @@ export class SalesService {
     }
   }
 
+  // Remove a venda de vez. Pendente: o estoque que ela reservava volta (cancela antes de apagar).
+  // Paga ou já cancelada: apaga sem mexer no estoque (paga = o produto saiu; cancelada = já voltou).
+  async remove(userId: string, saleId: string): Promise<void> {
+    const store = await this.getOwnStoreOrThrow(userId);
+    const sale = await this.repository.findById(store.id, saleId);
+    if (!sale) throw new NotFoundError('Venda não encontrada.');
+    if (sale.status === 'pending') await this.repository.cancel(store.id, saleId);
+    await this.repository.remove(store.id, saleId);
+  }
+
   // As definições (faturamento, lucro, margem) ficam em `buildSalesSummary`.
   async summary(userId: string, from: Date, to: Date, source?: SaleSource): Promise<SalesSummary> {
     const store = await this.getOwnStoreOrThrow(userId);

@@ -54,6 +54,11 @@ export function cancelSale(id: string) {
   return request<SaleDetail>(`/sales/${id}`, { method: 'PATCH', body: { status: 'cancelled' }, auth: true });
 }
 
+// Remove a venda de vez. Pendente devolve o estoque reservado; paga ou cancelada só é apagada (204).
+export function deleteSale(id: string) {
+  return request<null>(`/sales/${id}`, { method: 'DELETE', auth: true });
+}
+
 // Só `pending` vira `paid`; repetir em uma venda já paga devolve 200 igual (uma cancelada dá 409).
 export function markSalePaid(id: string) {
   return request<SaleDetail>(`/sales/${id}`, { method: 'PATCH', body: { status: 'paid' }, auth: true });

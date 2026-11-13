@@ -16,6 +16,7 @@ function createRepositoryMock(): jest.Mocked<SalesRepository> {
     countPending: jest.fn(),
     countBySource: jest.fn(),
     cancel: jest.fn(),
+    remove: jest.fn(),
     findExpiredOnlineOrders: jest.fn(),
     summaryData: jest.fn(),
     topProducts: jest.fn(),
@@ -507,6 +508,38 @@ describe('SalesService', () => {
       repository.findExpiredOnlineOrders.mockRejectedValue(new Error('banco fora do ar'));
 
       await expect(service.expireStaleOnlineOrders(CUTOFF)).rejects.toThrow('banco fora do ar');
+    });
+  });
+
+  describe('remove', () => {
+    it('lança NotFoundError quando a venda não é da loja', async () => {
+      const { repository, service } = build();
+      repository.findById.mockResolvedValue(null);
+
+      await expect(service.remove('user-1', 'x')).rejects.toBeInstanceOf(NotFoundError);
+      expect(repository.remove).not.toHaveBeenCalled();
+    });
+
+    it('venda pendente devolve o estoque (cancela) antes de apagar', async () => {
+      const { repository, service } = build();
+      const sale = buildSale({ status: 'pending' });
+      repository.findById.mockResolvedValue(sale);
+
+      await service.remove('user-1', sale.id);
+
+      expect(repository.cancel).toHaveBeenCalledWith('store-1', sale.id);
+      expect(repository.remove).toHaveBeenCalledWith('store-1', sale.id);
+    });
+
+    it('venda paga é apagada sem mexer no estoque', async () => {
+      const { repository, service } = build();
+      const sale = buildSale({ status: 'paid' });
+      repository.findById.mockResolvedValue(sale);
+
+      await service.remove('user-1', sale.id);
+
+      expect(repository.cancel).not.toHaveBeenCalled();
+      expect(repository.remove).toHaveBeenCalledWith('store-1', sale.id);
     });
   });
 
