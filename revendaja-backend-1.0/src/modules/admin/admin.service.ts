@@ -7,7 +7,12 @@ import { STORE_PLAN_LIMITS, STORE_PLAN_NAMES } from '../store/store.plans';
 import type { StorePlan } from '../store/store.types';
 import { adminRepository } from './admin.repository';
 import { ConflictError, NotFoundError } from '../../shared/errors/AppError';
-import type { AdminAiQuery, AdminCreateCatalogProduct, AdminStoresQuery } from './admin.schema';
+import type {
+  AdminAiQuery,
+  AdminCreateCatalogProduct,
+  AdminStoresQuery,
+  AdminUpdateCatalogProduct,
+} from './admin.schema';
 
 const DAY_MS = 24 * 60 * 60 * 1000;
 const WEEKS = 12;
@@ -255,6 +260,41 @@ export class AdminService {
       }
     }
     return adminRepository.createCatalogProduct(input);
+  }
+
+  async updateCatalogProduct(id: number, input: AdminUpdateCatalogProduct) {
+    if (!(await adminRepository.findCatalogProduct(id))) {
+      throw new NotFoundError('Produto não encontrado.');
+    }
+    if (input.brandId !== undefined && !(await adminRepository.findBrandId(input.brandId))) {
+      throw new NotFoundError('Marca não encontrada.');
+    }
+    if (input.barCode) {
+      const existing = await adminRepository.findProductByBarCode(input.barCode);
+      if (existing && existing.id !== id) {
+        throw new ConflictError(
+          `Já existe um produto com esse código de barras: ${existing.name} (#${existing.id}).`,
+        );
+      }
+    }
+    return adminRepository.updateCatalogProduct(id, input);
+  }
+
+  // Produto que alguma loja já adicionou só sai com `force` (a remoção some com ele dessas lojas;
+  // as vendas antigas ficam, pois guardam nome e preço do momento).
+  async deleteCatalogProduct(id: number, force: boolean): Promise<void> {
+    if (!(await adminRepository.findCatalogProduct(id))) {
+      throw new NotFoundError('Produto não encontrado.');
+    }
+    if (!force) {
+      const inUse = await adminRepository.countStoreProductsOf(id);
+      if (inUse > 0) {
+        throw new ConflictError(
+          `Este produto está em ${inUse} loja(s). Confirme para removê-lo delas também.`,
+        );
+      }
+    }
+    await adminRepository.deleteCatalogProduct(id);
   }
 }
 

@@ -442,4 +442,40 @@ export const adminRepository = {
     });
     return mapCatalogProduct(row);
   },
+
+  async findCatalogProduct(id: number): Promise<{ id: number } | null> {
+    return prisma.product.findUnique({ where: { id }, select: { id: true } });
+  },
+
+  async countStoreProductsOf(productId: number): Promise<number> {
+    return prisma.storeProduct.count({ where: { productId } });
+  },
+
+  async updateCatalogProduct(
+    id: number,
+    data: {
+      name?: string;
+      brandId?: number;
+      barCode?: string | null;
+      brandSku?: string | null;
+      description?: string | null;
+      basePrice?: number;
+      productImage?: string | null;
+    },
+  ) {
+    const row = await prisma.product.update({
+      where: { id },
+      data: {
+        ...data,
+        // Mesma foto nos dois tamanhos (como no cadastro).
+        ...(data.productImage !== undefined ? { productImageSm: data.productImage } : {}),
+      },
+      include: { brand: true },
+    });
+    return mapCatalogProduct(row);
+  },
+
+  async deleteCatalogProduct(id: number): Promise<void> {
+    await prisma.product.delete({ where: { id } });
+  },
 };

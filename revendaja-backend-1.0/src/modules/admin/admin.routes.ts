@@ -4,10 +4,18 @@ import { authenticate } from '../../shared/middlewares/authenticate';
 import { requireAdmin } from '../../shared/middlewares/requireAdmin';
 import {
   adminAiQuerySchema,
+  adminCatalogProductParamsSchema,
   adminCreateCatalogProductSchema,
+  adminDeleteCatalogProductQuerySchema,
+  adminUpdateCatalogProductSchema,
   adminStoresQuerySchema,
 } from './admin.schema';
-import type { AdminAiQuery, AdminCreateCatalogProduct, AdminStoresQuery } from './admin.schema';
+import type {
+  AdminAiQuery,
+  AdminCreateCatalogProduct,
+  AdminStoresQuery,
+  AdminUpdateCatalogProduct,
+} from './admin.schema';
 import { adminService } from './admin.service';
 
 // Painel da administradora. Todas as rotas exigem login e o papel `admin` (conferido no banco a cada
@@ -117,5 +125,43 @@ export async function adminRoutes(app: FastifyInstance): Promise<void> {
     },
     async (request: FastifyRequest<{ Body: AdminCreateCatalogProduct }>, reply: FastifyReply) =>
       reply.status(201).send(await adminService.createCatalogProduct(request.body)),
+  );
+
+  server.patch(
+    '/admin/catalog/products/:id',
+    {
+      preHandler,
+      schema: {
+        ...base,
+        summary: 'Edita um produto do catálogo global (qualquer campo; null limpa os opcionais).',
+        params: adminCatalogProductParamsSchema,
+        body: adminUpdateCatalogProductSchema,
+      },
+    },
+    async (
+      request: FastifyRequest<{ Params: { id: number }; Body: AdminUpdateCatalogProduct }>,
+      reply: FastifyReply,
+    ) => reply.send(await adminService.updateCatalogProduct(request.params.id, request.body)),
+  );
+
+  server.delete(
+    '/admin/catalog/products/:id',
+    {
+      preHandler,
+      schema: {
+        ...base,
+        summary:
+          'Remove um produto do catálogo global. Se alguma loja o usa, devolve 409 — repita com ?force=true para remover das lojas também.',
+        params: adminCatalogProductParamsSchema,
+        querystring: adminDeleteCatalogProductQuerySchema,
+      },
+    },
+    async (
+      request: FastifyRequest<{ Params: { id: number }; Querystring: { force: 'true' | 'false' } }>,
+      reply: FastifyReply,
+    ) => {
+      await adminService.deleteCatalogProduct(request.params.id, request.query.force === 'true');
+      return reply.status(204).send();
+    },
   );
 }

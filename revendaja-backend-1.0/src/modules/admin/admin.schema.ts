@@ -38,9 +38,34 @@ export const adminCreateCatalogProductSchema = z.object({
   description: optionalText(2000),
   basePrice: z.number().positive().max(100000),
   // URL devolvida por /admin/uploads/catalog-image.
-  productImage: z.string().url().max(500).optional(),
+  productImage: z.string().url().max(500),
 });
 
+// Edição parcial. `barCode`/`brandSku`/`description`/`productImage` aceitam null para LIMPAR o campo.
+export const adminUpdateCatalogProductSchema = z
+  .object({
+    name: z.string().trim().min(2).max(160),
+    brandId: z.number().int().positive(),
+    barCode: z
+      .string()
+      .trim()
+      .regex(/^\d{8,14}$/, 'O código de barras deve ter de 8 a 14 dígitos.')
+      .nullable(),
+    brandSku: z.string().trim().max(80).nullable(),
+    description: z.string().trim().max(2000).nullable(),
+    basePrice: z.number().positive().max(100000),
+    productImage: z.string().url().max(500).nullable(),
+  })
+  .partial()
+  .refine((value) => Object.keys(value).length > 0, 'Informe ao menos um campo para alterar.');
+
+export const adminCatalogProductParamsSchema = z.object({ id: z.coerce.number().int().positive() });
+export const adminDeleteCatalogProductQuerySchema = z.object({
+  // Sem `force`, produto que alguma loja usa não é removido (a remoção some com ele das lojas).
+  force: z.enum(['true', 'false']).default('false'),
+});
+
+export type AdminUpdateCatalogProduct = z.infer<typeof adminUpdateCatalogProductSchema>;
 export type AdminCreateCatalogProduct = z.infer<typeof adminCreateCatalogProductSchema>;
 export type AdminStoresQuery = z.infer<typeof adminStoresQuerySchema>;
 export type AdminAiQuery = z.infer<typeof adminAiQuerySchema>;

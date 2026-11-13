@@ -205,3 +205,21 @@ export function uploadCatalogImage(file: File) {
 export function createCatalogProduct(input: NewCatalogProduct) {
   return request<CatalogProduct>('/admin/catalog/products', { method: 'POST', body: input, auth: true });
 }
+
+export type UpdateCatalogProduct = Partial<{
+  name: string;
+  brandId: number;
+  barCode: string | null;
+  brandSku: string | null;
+  description: string | null;
+  basePrice: number;
+}>;
+
+export function updateCatalogProduct(id: number, input: UpdateCatalogProduct) {
+  return request<CatalogProduct>(`/admin/catalog/products/${id}`, { method: 'PATCH', body: input, auth: true });
+}
+
+// Sem `force`, produto que alguma loja usa devolve 409 (a mensagem diz em quantas lojas).
+export function deleteCatalogProduct(id: number, force = false) {
+  return request<null>(`/admin/catalog/products/${id}${force ? '?force=true' : ''}`, { method: 'DELETE', auth: true });
+}
