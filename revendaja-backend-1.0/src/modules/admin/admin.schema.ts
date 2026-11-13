@@ -41,7 +41,7 @@ export const adminCreateCatalogProductSchema = z.object({
   productImage: z.string().url().max(500),
 });
 
-// Edição parcial. `barCode`/`brandSku`/`description`/`productImage` aceitam null para LIMPAR o campo.
+// Edição parcial. `barCode`/`brandSku`/`description` aceitam null para LIMPAR o campo.
 export const adminUpdateCatalogProductSchema = z
   .object({
     name: z.string().trim().min(2).max(160),
@@ -54,7 +54,7 @@ export const adminUpdateCatalogProductSchema = z
     brandSku: z.string().trim().max(80).nullable(),
     description: z.string().trim().max(2000).nullable(),
     basePrice: z.number().positive().max(100000),
-    productImage: z.string().url().max(500).nullable(),
+    productImage: z.string().url().max(500),
   })
   .partial()
   .refine((value) => Object.keys(value).length > 0, 'Informe ao menos um campo para alterar.');

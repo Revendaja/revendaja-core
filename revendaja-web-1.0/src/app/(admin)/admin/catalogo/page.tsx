@@ -31,6 +31,27 @@ function ManageProducts({ brands }: { brands: { id: number | null; name: string 
   const [form, setForm] = useState({ name: '', brandId: '', price: '', barCode: '', brandSku: '', description: '' });
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [newImage, setNewImage] = useState<File | null>(null);
+  const [newPreview, setNewPreview] = useState<string | null>(null);
+  const editFileInput = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    if (!newImage) {
+      setNewPreview(null);
+      return;
+    }
+    const url = URL.createObjectURL(newImage);
+    setNewPreview(url);
+    return () => URL.revokeObjectURL(url);
+  }, [newImage]);
+
+  function pickNewImage(file: File | undefined) {
+    if (!file) return;
+    if (!ACCEPTED_TYPES.includes(file.type)) return setError('Formato de imagem não suportado. Use JPEG, PNG ou WEBP.');
+    if (file.size > MAX_IMAGE_BYTES) return setError('Imagem muito grande (máx. 5 MB).');
+    setError(null);
+    setNewImage(file);
+  }
 
   useEffect(() => {
     const timer = setTimeout(() => {
@@ -51,6 +72,7 @@ function ManageProducts({ brands }: { brands: { id: number | null; name: string 
 
   function startEdit(product: CatalogProduct) {
     setError(null);
+    setNewImage(null);
     setEditing(product);
     setForm({
       name: product.name,
@@ -74,7 +96,10 @@ function ManageProducts({ brands }: { brands: { id: number | null; name: string 
     if (code && !/^\d{8,14}$/.test(code)) return setError('O código de barras deve ter de 8 a 14 dígitos.');
     setBusy(true);
     try {
+      // A foto nova sobe primeiro (S3); sem foto nova, a atual é mantida.
+      const productImage = newImage ? (await uploadCatalogImage(newImage)).url : undefined;
       await updateCatalogProduct(editing.id, {
+        ...(productImage ? { productImage } : {}),
         name: form.name.trim(),
         brandId: Number(form.brandId),
         basePrice,
@@ -92,7 +117,7 @@ function ManageProducts({ brands }: { brands: { id: number | null; name: string 
   }
 
   async function remove(product: CatalogProduct) {
-    if (!window.confirm(`Remover "${product.name}" do catálogo?`)) return;
+    if (!window.confirm(`Excluir "${product.name}" do catálogo?`)) return;
     try {
       await deleteCatalogProduct(product.id);
     } catch (err) {
@@ -110,6 +135,7 @@ function ManageProducts({ brands }: { brands: { id: number | null; name: string 
         return;
       }
     }
+    if (editing?.id === product.id) setEditing(null);
     refresh();
   }
 
@@ -172,6 +198,37 @@ function ManageProducts({ brands }: { brands: { id: number | null; name: string 
               onChange={(e) => setForm({ ...form, description: e.target.value })}
             />
           </label>
+          <div className={labelClass}>
+            Foto do produto
+            <input
+              ref={editFileInput}
+              type="file"
+              accept="image/jpeg,image/png,image/webp"
+              onChange={(e) => pickNewImage(e.target.files?.[0])}
+              className="sr-only"
+              tabIndex={-1}
+            />
+            <button
+              type="button"
+              onClick={() => editFileInput.current?.click()}
+              onDragOver={(e) => e.preventDefault()}
+              onDrop={(e) => {
+                e.preventDefault();
+                pickNewImage(e.dataTransfer.files?.[0]);
+              }}
+              className="group relative flex h-40 w-full items-center justify-center overflow-hidden rounded-xl border-2 border-dashed border-ink-300 bg-ink-50 text-ink-500 hover:border-primary-500"
+            >
+              {newPreview || editing.productImage ? (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img src={newPreview ?? editing.productImage ?? ''} alt="Foto do produto" className="h-full w-full object-contain" />
+              ) : (
+                <span className="text-[13px] font-semibold">Clique para escolher a foto</span>
+              )}
+              <span className="absolute inset-x-0 bottom-0 bg-ink-900/60 py-1 text-center text-[12px] font-semibold text-white">
+                {newImage ? 'Nova foto (salve para aplicar) · clique para trocar' : 'Clique ou arraste para trocar a foto'}
+              </span>
+            </button>
+          </div>
           {error && <p className="text-[13px] text-danger">{error}</p>}
           <div className="flex gap-2">
             <button type="submit" disabled={busy} className="h-9 rounded-lg bg-primary-500 px-4 text-[13px] font-semibold text-white disabled:opacity-60">
@@ -179,6 +236,13 @@ function ManageProducts({ brands }: { brands: { id: number | null; name: string 
             </button>
             <button type="button" onClick={() => setEditing(null)} className="h-9 rounded-lg border border-ink-200 px-4 text-[13px] text-ink-700">
               Cancelar
+            </button>
+            <button
+              type="button"
+              onClick={() => void remove(editing)}
+              className="ml-auto h-9 rounded-lg border border-danger px-4 text-[13px] font-semibold text-danger"
+            >
+              Excluir produto
             </button>
           </div>
         </form>
