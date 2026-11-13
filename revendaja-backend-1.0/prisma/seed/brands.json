@@ -94,5 +94,17 @@
     "profitability": 15,
     "createdAt": "2023-11-22T03:58:40.270Z",
     "updatedAt": "2023-11-22T03:58:40.270Z"
+  },
+  {
+    "id": 223,
+    "name": "Odorata",
+    "logo": null,
+    "fromCatalog": true,
+    "fullCatalog": true,
+    "ownerId": null,
+    "companyId": null,
+    "profitability": 0,
+    "createdAt": "2026-11-12T12:00:00.000Z",
+    "updatedAt": "2026-11-12T12:00:00.000Z"
   }
 ]

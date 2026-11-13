@@ -21,6 +21,7 @@ import {
 } from 'expo-audio';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
+import FormattedText from '../../components/FormattedText';
 import ProductImage from '../../components/ProductImage';
 import {
   cancelAiAction,
@@ -156,6 +157,7 @@ export default function AssistantScreen({ navigation }: Props) {
   const [busyActionId, setBusyActionId] = useState<string | null>(null);
   const [conversationId, setConversationId] = useState<string | null>(null);
   const [text, setText] = useState('');
+  const [inputHeight, setInputHeight] = useState(44);
   const [sending, setSending] = useState(false);
   const [transcribing, setTranscribing] = useState(false);
 
@@ -329,7 +331,7 @@ export default function AssistantScreen({ navigation }: Props) {
     return (
       <View className="mb-3 self-stretch">
         <View className="self-start max-w-[90%] bg-white rounded-2xl rounded-bl-md px-4 py-3">
-          <Text className="text-ink-900 text-sm leading-5">{item.text}</Text>
+          <FormattedText className="text-ink-900 text-sm leading-5">{item.text}</FormattedText>
         </View>
         {item.cards.length > 0 && (
           <ScrollView horizontal showsHorizontalScrollIndicator={false} className="mt-2">
@@ -496,7 +498,13 @@ export default function AssistantScreen({ navigation }: Props) {
               multiline
               maxLength={maxChars}
               editable={!sending}
-              className="flex-1 min-h-[44px] max-h-32 bg-white rounded-3xl px-4 py-3 text-sm text-ink-900"
+              // Altura explícita: o multiline do iOS ignora o min-h e fica mais alto que os botões
+              // (44pt). Com lineHeight fixo, 1 linha = 20 + 12 + 12 = 44; cresce até 128 (max-h-32).
+              onContentSizeChange={(event) =>
+                setInputHeight(Math.min(128, Math.max(44, Math.ceil(event.nativeEvent.contentSize.height) + 24)))
+              }
+              style={{ height: inputHeight, lineHeight: 20, paddingTop: 12, paddingBottom: 12 }}
+              className="flex-1 bg-white rounded-3xl px-4 text-sm text-ink-900"
             />
             <Pressable
               onPress={() => void send(text)}
