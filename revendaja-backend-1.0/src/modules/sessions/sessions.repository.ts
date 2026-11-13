@@ -1,3 +1,4 @@
+import { env } from '../../config/env';
 import { prisma } from '../../database/prisma';
 import type { User } from '../users/users.types';
 import type { Session, SessionClient } from './sessions.types';
@@ -64,20 +65,33 @@ export const sessionsRepository = {
     };
   },
 
-  // Cria a sessão da usuária ou SUBSTITUI a que já existe PARA O MESMO TIPO DE APARELHO. É aqui
-  // que "uma sessão por aparelho (web / mobile)" acontece: `(userId, client)` é único, então o
-  // upsert nunca gera duas linhas do mesmo tipo, e o `id` novo invalida todos os tokens anteriores
-  // daquele tipo. A sessão do outro tipo não é tocada.
+  // Cria a sessão. Web: no máximo uma (a anterior cai). Mobile: até `MAX_MOBILE_SESSIONS` aparelhos
+  // ao mesmo tempo; passando disso, as mais antigas caem. O `id` novo é o `sid` dos tokens emitidos.
   replaceForUser(
     userId: string,
     sessionId: string,
     expiresAt: Date,
     client: SessionClient = 'mobile',
   ): Promise<Session> {
-    return prisma.session.upsert({
-      where: { userId_client: { userId, client } },
-      create: { id: sessionId, userId, client, expiresAt },
-      update: { id: sessionId, expiresAt, createdAt: new Date() },
+    return prisma.$transaction(async (tx) => {
+      if (client === 'web') {
+        await tx.session.deleteMany({ where: { userId, client: 'web' } });
+      }
+      const created = await tx.session.create({
+        data: { id: sessionId, userId, client, expiresAt },
+      });
+      if (client === 'mobile') {
+        const keep = await tx.session.findMany({
+          where: { userId, client: 'mobile' },
+          orderBy: { createdAt: 'desc' },
+          take: env.MAX_MOBILE_SESSIONS,
+          select: { id: true },
+        });
+        await tx.session.deleteMany({
+          where: { userId, client: 'mobile', id: { notIn: keep.map((row) => row.id) } },
+        });
+      }
+      return created;
     });
   },
 

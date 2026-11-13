@@ -21,9 +21,9 @@ export function isSessionActive(session: Session | null, userId: string): sessio
   return session !== null && session.userId === userId && session.expiresAt.getTime() > Date.now();
 }
 
-// Regra de "uma sessão por tipo de aparelho": iniciar uma sessão derruba a anterior do MESMO tipo
-// (web ou mobile), sem afetar a do outro tipo. Os dois tokens carregam o id da sessão (`sid`) e o middleware
-// `authenticate` confere no banco que esse id ainda é a sessão vigente.
+// Regra de sessões: UMA no web (um novo login web derruba o anterior) e até `MAX_MOBILE_SESSIONS` no mobile
+// (vários aparelhos; passando do limite, o mais antigo cai). Os dois tokens carregam o id da sessão (`sid`) e
+// o middleware `authenticate` confere no banco que esse id ainda existe.
 export class SessionService {
   constructor(private readonly repository: SessionsRepository = sessionsRepository) {}
 

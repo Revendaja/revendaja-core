@@ -55,11 +55,10 @@ enum SessionClient {
   mobile
 }
 
-/// Sessão ativa de uma conta: no máximo UMA por tipo de aparelho (`@@unique([userId, client])`,
-/// garantido pelo próprio banco) — uma no web e uma no mobile, que não se derrubam. Um novo login
-/// do mesmo tipo troca o `id` da sessão existente (ver `sessionsRepository.replaceForUser`), e como
-/// todo token carrega o `id` da sessão (claim `sid`), os tokens do login anterior deixam de valer na
-/// hora — o aparelho antigo daquele tipo cai no próximo request.
+/// Sessão ativa de uma conta: uma no web e até `MAX_MOBILE_SESSIONS` no mobile (vários
+/// aparelhos). Um novo login web derruba o web anterior; um novo login mobile além do limite derruba
+/// o mobile mais antigo (ver `sessionsRepository.replaceForUser`). Todo token carrega o `id` da sessão
+/// (claim `sid`), então uma sessão removida deixa de valer no próximo request.
 model Session {
   id        String        @id @default(uuid())
   userId    String        @map("user_id")
@@ -69,7 +68,7 @@ model Session {
 
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
-  @@unique([userId, client])
+  @@index([userId, client])
 
   @@map("sessions")
 }

@@ -1,7 +1,14 @@
 const queryRaw = jest.fn();
 
+const tx = {
+  session: { deleteMany: jest.fn(), create: jest.fn(), findMany: jest.fn() },
+};
+
 jest.mock('../../../database/prisma', () => ({
-  prisma: { $queryRaw: (...args: unknown[]) => queryRaw(...args) },
+  prisma: {
+    $queryRaw: (...args: unknown[]) => queryRaw(...args),
+    $transaction: (fn: (t: typeof tx) => unknown) => fn(tx),
+  },
 }));
 
 import { sessionsRepository } from '../sessions.repository';
@@ -73,5 +80,33 @@ describe('sessionsRepository.findByIdWithUser', () => {
   it('devolve null quando a sessão não existe', async () => {
     queryRaw.mockResolvedValue([]);
     await expect(sessionsRepository.findByIdWithUser(SESSION_ID)).resolves.toBeNull();
+  });
+});
+
+describe('sessionsRepository.replaceForUser', () => {
+  beforeEach(() => {
+    tx.session.deleteMany.mockReset();
+    tx.session.create.mockReset();
+    tx.session.findMany.mockReset();
+  });
+
+  it('mobile: mantém as mais recentes (vários aparelhos) e apaga só o excedente', async () => {
+    tx.session.findMany.mockResolvedValue([{ id: 'a' }, { id: 'b' }]);
+
+    await sessionsRepository.replaceForUser(USER_ID, SESSION_ID, new Date(), 'mobile');
+
+    expect(tx.session.create).toHaveBeenCalledTimes(1);
+    expect(tx.session.deleteMany).toHaveBeenCalledWith({
+      where: { userId: USER_ID, client: 'mobile', id: { notIn: ['a', 'b'] } },
+    });
+  });
+
+  it('web: apaga a sessão web anterior antes de criar a nova', async () => {
+    await sessionsRepository.replaceForUser(USER_ID, SESSION_ID, new Date(), 'web');
+
+    expect(tx.session.deleteMany).toHaveBeenCalledWith({
+      where: { userId: USER_ID, client: 'web' },
+    });
+    expect(tx.session.findMany).not.toHaveBeenCalled();
   });
 });

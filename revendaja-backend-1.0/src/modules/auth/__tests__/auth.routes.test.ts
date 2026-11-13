@@ -15,13 +15,23 @@ const userUpdate = jest.fn();
 const otpCodeCreate = jest.fn();
 const storeFindUnique = jest.fn();
 
+const sessionTx = () => ({
+  session: {
+    create: (...args: unknown[]) => sessionUpsert(...args),
+    findMany: async () => [],
+    deleteMany: (...args: unknown[]) => sessionDeleteMany(...args),
+  },
+});
+
 jest.mock('../../../database/prisma', () => ({
   prisma: {
+    $transaction: async (fn: (tx: unknown) => unknown) => fn(sessionTx()),
     $queryRaw: async (...args: unknown[]) =>
       sessionHelpers.emulateSessionJoin(sessionFindUnique, userFindUnique, args),
     session: {
       findUnique: (...args: unknown[]) => sessionFindUnique(...args),
-      upsert: (...args: unknown[]) => sessionUpsert(...args),
+      create: (...args: unknown[]) => sessionUpsert(...args),
+      findMany: async () => [],
       deleteMany: (...args: unknown[]) => sessionDeleteMany(...args),
     },
     user: {
@@ -173,8 +183,9 @@ describe('POST /auth/login', () => {
 
     // O login grava/substitui a sessão da usuária para o tipo de aparelho (sem Origin = mobile).
     expect(sessionUpsert).toHaveBeenCalledTimes(1);
-    expect(sessionUpsert.mock.calls[0][0].where).toEqual({
-      userId_client: { userId: USER_ID, client: 'mobile' },
+    expect(sessionUpsert.mock.calls[0][0].data).toMatchObject({
+      userId: USER_ID,
+      client: 'mobile',
     });
 
     await app.close();

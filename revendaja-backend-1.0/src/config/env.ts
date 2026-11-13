@@ -60,6 +60,9 @@ const envSchema = z
       .optional()
       .transform((value) => value || undefined),
 
+    // Quantos aparelhos mobile podem ficar logados ao mesmo tempo (o mais antigo cai ao passar disso).
+    MAX_MOBILE_SESSIONS: z.coerce.number().int().min(1).default(5),
+
     OTP_EXPIRATION_MINUTES: z.coerce.number().int().positive().default(10),
     OTP_MAX_ATTEMPTS: z.coerce.number().int().positive().default(5),
     OTP_RESEND_COOLDOWN_SECONDS: z.coerce.number().int().positive().default(30),
