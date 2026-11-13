@@ -58,7 +58,6 @@ type CartLine = { product: StorefrontProduct; quantity: number };
 
 const MAX_CART_ITEMS = 50;
 const MAX_QUANTITY = 99;
-const MAX_INSTALLMENTS = 12;
 const NAME_MAX = 120;
 const ADDRESS_MIN = 8;
 const ADDRESS_MAX = 300;
@@ -474,7 +473,6 @@ function CartPanel({
   // Sem endereço salvo, parte do CEP informado no cabeçalho (o cliente completa com número e complemento).
   const [address, setAddress] = useState(saved?.address || (cep ? addressFromCep(cep) : ''));
   const [paymentMethod, setPaymentMethod] = useState<NewSalePaymentMethod>(savedPayment ?? methods[0]?.method ?? 'pix');
-  const [installments, setInstallments] = useState(1);
   // Entrega paga em dinheiro: o cliente diz se precisa de troco e para quanto.
   const [needsChange, setNeedsChange] = useState<boolean | null>(null);
   const [changeFor, setChangeFor] = useState('');
@@ -526,7 +524,6 @@ function CartPanel({
       fulfillment,
       ...(isDelivery ? { deliveryAddress } : {}),
       paymentMethod,
-      ...(paymentMethod === 'card' ? { installments } : {}),
       ...(cashChangeFor !== undefined ? { cashChangeFor } : {}),
       items,
     };
@@ -782,34 +779,6 @@ function CartPanel({
                     </div>
                   )}
 
-                  {paymentMethod === 'card' && (
-                    <div className="flex h-12 items-center justify-between rounded-xl bg-ink-50 px-4">
-                      <span className="text-sm text-ink-700">Parcelas</span>
-                      <div className="flex items-center gap-1">
-                        <button
-                          type="button"
-                          onClick={() => setInstallments((value) => Math.max(1, value - 1))}
-                          disabled={installments <= 1 || loading}
-                          aria-label="Diminuir parcelas"
-                          className="flex h-8 w-8 items-center justify-center rounded-full text-ink-700 hover:bg-ink-100 disabled:opacity-40"
-                        >
-                          <Icon name="minus" size={14} strokeWidth={2.4} />
-                        </button>
-                        <span className="min-w-16 text-center text-sm font-bold text-ink-900">
-                          {installments === 1 ? 'à vista' : `${installments}x`}
-                        </span>
-                        <button
-                          type="button"
-                          onClick={() => setInstallments((value) => Math.min(MAX_INSTALLMENTS, value + 1))}
-                          disabled={installments >= MAX_INSTALLMENTS || loading}
-                          aria-label="Aumentar parcelas"
-                          className="flex h-8 w-8 items-center justify-center rounded-full bg-primary-500 text-white hover:bg-primary-600 disabled:opacity-40"
-                        >
-                          <Icon name="plus" size={14} strokeWidth={2.4} />
-                        </button>
-                      </div>
-                    </div>
-                  )}
                 </div>
               </>
             )}

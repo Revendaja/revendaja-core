@@ -28,7 +28,6 @@ type Props = BottomTabScreenProps<RootTabParamList, 'NovaVenda'>;
 type CartLine = { item: StoreProduct; quantity: number };
 
 const CUSTOMER_NAME_MAX = 120;
-const MAX_INSTALLMENTS = 24;
 const MAX_CART_ITEMS = 50;
 const SEARCH_DEBOUNCE_MS = 400;
 const RESULTS_LIMIT = 5;
@@ -46,7 +45,6 @@ export default function NewSaleScreen({ navigation }: Props) {
 
   const [customerName, setCustomerName] = useState('');
   const [paymentMethod, setPaymentMethod] = useState<NewSalePaymentMethod>('pix');
-  const [installments, setInstallments] = useState(1);
   const [cart, setCart] = useState<CartLine[]>([]);
   const [nameError, setNameError] = useState<string | null>(null);
   const [formError, setFormError] = useState<string | null>(null);
@@ -178,7 +176,6 @@ export default function NewSaleScreen({ navigation }: Props) {
   function resetForm() {
     setCustomerName('');
     setPaymentMethod('pix');
-    setInstallments(1);
     setCart([]);
     setProductQuery('');
     commitQuery('');
@@ -208,7 +205,6 @@ export default function NewSaleScreen({ navigation }: Props) {
     const content: Omit<CreateSaleInput, 'clientRequestId'> = {
       customerName: name,
       paymentMethod,
-      ...(paymentMethod === 'card' ? { installments } : {}),
       items: cart.map((line) => ({ storeProductId: line.item.id, quantity: line.quantity })),
     };
     const sold = content.items;
@@ -300,36 +296,6 @@ export default function NewSaleScreen({ navigation }: Props) {
             })}
           </View>
 
-          {paymentMethod === 'card' && (
-            <View className="flex-row items-center justify-between bg-white rounded-xl px-4 h-12 mt-3">
-              <Text className="text-sm text-ink-700">Parcelas</Text>
-              <View className="flex-row items-center bg-ink-50 rounded-full">
-                <Pressable
-                  onPress={() => setInstallments((value) => Math.max(1, value - 1))}
-                  disabled={installments <= 1 || loading}
-                  accessibilityRole="button"
-                  accessibilityLabel="Diminuir parcelas"
-                  className="w-8 h-8 items-center justify-center"
-                  style={{ opacity: installments <= 1 ? 0.4 : 1 }}
-                >
-                  <Ionicons name="remove" size={16} color="#3A3D4D" />
-                </Pressable>
-                <Text className="text-sm font-bold text-ink-900 text-center" style={{ minWidth: 64 }}>
-                  {installments === 1 ? 'à vista' : `${installments}x`}
-                </Text>
-                <Pressable
-                  onPress={() => setInstallments((value) => Math.min(MAX_INSTALLMENTS, value + 1))}
-                  disabled={installments >= MAX_INSTALLMENTS || loading}
-                  accessibilityRole="button"
-                  accessibilityLabel="Aumentar parcelas"
-                  className="w-8 h-8 rounded-full bg-primary-500 items-center justify-center"
-                  style={{ opacity: installments >= MAX_INSTALLMENTS ? 0.4 : 1 }}
-                >
-                  <Ionicons name="add" size={16} color="#fff" />
-                </Pressable>
-              </View>
-            </View>
-          )}
 
           <Text className="text-xs font-bold text-ink-500 mb-1.5 mt-4">Adicionar produto</Text>
           <View className="flex-row items-center gap-2 mb-1">

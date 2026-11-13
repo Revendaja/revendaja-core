@@ -12,6 +12,20 @@ import { SafeImage } from './SafeImage';
 
 export type NavSection = { id: string; label: string };
 
+// Sem logo (ou se ela não carregar): inicial da loja num quadrado laranja e o nome ao lado.
+function InitialAndName({ storeName }: { storeName: string }) {
+  return (
+    <>
+      <span className="flex h-10 w-10 shrink-0 items-center justify-center overflow-hidden rounded-xl bg-primary-500 text-lg font-bold text-white">
+        {storeName.charAt(0).toUpperCase()}
+      </span>
+      <span className="hidden max-w-44 truncate text-base font-bold tracking-tight text-ink-900 sm:block">
+        {storeName}
+      </span>
+    </>
+  );
+}
+
 // Barra de aviso (topo), cabeçalho fixo (logo, busca, CEP, saudação e sacola) e, embaixo, as
 // categorias que vêm do estoque da loja. Cliente não tem conta: a saudação é "Visitante" até o
 // primeiro pedido, quando o nome fica salvo neste aparelho.
@@ -67,7 +81,15 @@ export function StorefrontHeader({
       {announcement.enabled && (
         <div className="bg-ink-900 text-white">
           <div className="mx-auto flex max-w-6xl items-center justify-between gap-4 px-4 py-2 text-xs">
-            <p className="min-w-0 truncate font-medium">{announcement.text}</p>
+            {/* Letreiro: o texto corre da direita para a esquerda sem parar (pausa ao passar o mouse). */}
+            <div className="announcement-marquee min-w-0 flex-1 overflow-hidden">
+              <div className="announcement-track">
+                {/* A cópia que fecha o laço vem do CSS (data-text), então o texto aparece uma vez só para leitores de tela. */}
+                <p className="announcement-text whitespace-nowrap font-medium" data-text={announcement.text}>
+                  {announcement.text}
+                </p>
+              </div>
+            </div>
             {rightText && (
               <p className="hidden shrink-0 items-center gap-1.5 text-white/80 sm:flex">
                 <TruckIcon size={14} />
@@ -79,33 +101,30 @@ export function StorefrontHeader({
       )}
 
       <header className="sticky top-0 z-30 border-b border-ink-100 bg-white/95 backdrop-blur">
-        <div className="mx-auto flex max-w-6xl items-center gap-3 px-4 py-3 md:gap-6">
+        <div className="mx-auto flex max-w-6xl flex-wrap items-center gap-x-3 gap-y-2.5 px-4 py-3 md:flex-nowrap md:gap-6">
           <button
             type="button"
             onClick={() => window.scrollTo({ top: 0, behavior: 'smooth' })}
-            className="flex min-w-0 shrink-0 items-center gap-2.5 text-left"
+            className="mr-auto flex min-w-0 shrink-0 items-center gap-2.5 text-left md:mr-0"
             aria-label={`${storeName}: voltar ao topo`}
           >
-            <span className="flex h-10 w-10 shrink-0 items-center justify-center overflow-hidden rounded-xl bg-primary-500 text-lg font-bold text-white">
-              {logo ? (
-                <SafeImage
-                  src={logo}
-                  alt=""
-                  loading="eager"
-                  className="h-full w-full bg-white object-contain"
-                  fallback={storeName.charAt(0).toUpperCase()}
-                />
-              ) : (
-                storeName.charAt(0).toUpperCase()
-              )}
-            </span>
-            <span className="hidden max-w-44 truncate text-base font-bold tracking-tight text-ink-900 sm:block">
-              {storeName}
-            </span>
+            {logo ? (
+              // Com logo, só ela aparece (ela já traz o nome da marca): sem ícone nem nome repetidos.
+              <SafeImage
+                src={logo}
+                alt={storeName}
+                loading="eager"
+                className="h-11 w-auto max-w-40 object-contain sm:max-w-56"
+                fallback={<InitialAndName storeName={storeName} />}
+              />
+            ) : (
+              <InitialAndName storeName={storeName} />
+            )}
           </button>
 
-          <form onSubmit={submitSearch} role="search" className="flex min-w-0 flex-1 md:mx-2">
-            <label className="flex h-10 w-full items-center gap-2 rounded-full border border-ink-200 bg-ink-50 px-3.5 transition focus-within:border-primary-500 focus-within:bg-white">
+          {/* No celular a busca vai para uma linha própria, embaixo, larga e alta para digitar. */}
+          <form onSubmit={submitSearch} role="search" className="order-last flex min-w-0 basis-full md:order-none md:mx-2 md:flex-1 md:basis-auto">
+            <label className="flex h-12 w-full items-center gap-2 rounded-full border border-ink-200 bg-ink-50 px-4 md:h-10 md:px-3.5 transition focus-within:border-primary-500 focus-within:bg-white">
               <Icon name="search" size={16} className="shrink-0 text-ink-400" />
               <input
                 value={query}
@@ -113,7 +132,7 @@ export function StorefrontHeader({
                 placeholder="Buscar produtos..."
                 aria-label="Buscar produto"
                 autoComplete="off"
-                className="h-full min-w-0 flex-1 bg-transparent text-sm text-ink-900 outline-none placeholder:text-ink-400"
+                className="h-full min-w-0 flex-1 bg-transparent text-base text-ink-900 md:text-sm outline-none placeholder:text-ink-400"
               />
               {query && (
                 <button type="button" onClick={() => onQueryChange('')} aria-label="Limpar busca" className="text-ink-300 hover:text-ink-600">
@@ -147,9 +166,9 @@ export function StorefrontHeader({
           </button>
         </div>
 
-        {/* Categorias do estoque da loja (rolável no celular) + atalhos das seções que existem. */}
+        {/* Categorias do estoque da loja + atalhos das seções que existem. Só no desktop: no celular a página já tem "Compre por categoria". */}
         {(categories.length > 0 || sections.length > 0) && (
-          <nav aria-label="Categorias" className="border-t border-ink-100">
+          <nav aria-label="Categorias" className="hidden border-t border-ink-100 md:block">
             <div className="mx-auto flex max-w-6xl items-center gap-1 overflow-x-auto px-3 py-1.5 md:px-4">
               {categories.length > 0 && (
                 <NavButton active={activeFilter === null} onClick={onClearCategory}>

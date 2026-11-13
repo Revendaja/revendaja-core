@@ -204,16 +204,31 @@ describe('updateStorefrontConfigSchema', () => {
 
 describe('banners do topo', () => {
   const bucket = process.env.S3_PUBLIC_BASE_URL;
+  const updateStorefrontCustomizationOk = (banner: Record<string, unknown>) =>
+    updateStorefrontConfigSchema.safeParse({ banners: [{ ...banner, link: null }] }).success;
   const banners = (...urls: string[]) =>
     updateStorefrontConfigSchema.safeParse({
       banners: urls.map((imageUrl) => ({ imageUrl, link: null })),
     }).success;
 
-  it('o padrão tem 3 banners de exemplo, cada um com um destino', () => {
+  it('o padrão usa as artes padrão (larga + vertical para o celular), cada uma com um destino', () => {
     const config = buildDefaultConfig('Leal');
 
-    expect(config.banners.map((banner) => banner.imageUrl)).toEqual([...DEFAULT_BANNER_IMAGES]);
-    expect(config.banners.every((banner) => banner.link !== null)).toBe(true);
+    expect(config.banners.length).toBeGreaterThan(0);
+    for (const banner of config.banners) {
+      expect(DEFAULT_BANNER_IMAGES).toContain(banner.imageUrl);
+      expect(DEFAULT_BANNER_IMAGES).toContain(banner.mobileImageUrl);
+      expect(banner.link).not.toBeNull();
+    }
+  });
+
+  it('aceita a versão de celular do banner (padrão ou upload da loja) e rejeita link de terceiros', () => {
+    const parse = (mobileImageUrl: string | null) =>
+      updateStorefrontCustomizationOk({ imageUrl: DEFAULT_BANNER_IMAGES[0], mobileImageUrl });
+    expect(parse(DEFAULT_BANNER_IMAGES[1])).toBe(true);
+    expect(parse(`${bucket}/users/u1/banners/m.jpg`)).toBe(true);
+    expect(parse(null)).toBe(true);
+    expect(parse('https://cdn.exemplo.com/m.jpg')).toBe(false);
   });
 
   it('aceita upload da loja e os banners de exemplo, mas não imagem de terceiros', () => {

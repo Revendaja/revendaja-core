@@ -408,7 +408,8 @@ export type CollectionLink =
   | { type: 'brand'; id: number };
 
 // Banner do topo da vitrine (carrossel). `link` null = só enfeite.
-export type StorefrontBanner = { imageUrl: string; link: CollectionLink | null };
+// `mobileImageUrl`: versão vertical para o celular (ausente/null = o celular usa `imageUrl`).
+export type StorefrontBanner = { imageUrl: string; mobileImageUrl?: string | null; link: CollectionLink | null };
 
 export const MAX_BANNERS = 5;
 

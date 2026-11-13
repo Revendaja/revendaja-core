@@ -18,6 +18,8 @@ const ai = jest.fn();
 const plans = jest.fn();
 const system = jest.fn();
 const latency = jest.fn();
+const updateCatalogProduct = jest.fn();
+const deleteCatalogProduct = jest.fn();
 
 jest.mock('../admin.service', () => ({
   adminService: {
@@ -27,6 +29,8 @@ jest.mock('../admin.service', () => ({
     plans: (...args: unknown[]) => plans(...args),
     system: (...args: unknown[]) => system(...args),
     latency: (...args: unknown[]) => latency(...args),
+    updateCatalogProduct: (...args: unknown[]) => updateCatalogProduct(...args),
+    deleteCatalogProduct: (...args: unknown[]) => deleteCatalogProduct(...args),
   },
 }));
 
@@ -63,6 +67,8 @@ beforeEach(() => {
     plans,
     system,
     latency,
+    updateCatalogProduct,
+    deleteCatalogProduct,
   ]) {
     fn.mockReset();
   }
@@ -156,5 +162,57 @@ describe('painel da administradora', () => {
     expect((await get('/admin/ai?period=2026-13', ADMIN_TOKEN)).statusCode).toBe(400);
     expect((await get('/admin/ai?period=2026-10', ADMIN_TOKEN)).statusCode).toBe(200);
     expect(ai).toHaveBeenCalledWith({ period: '2026-10' });
+  });
+
+  describe('catálogo global: editar e remover', () => {
+    async function call(method: 'PATCH' | 'DELETE', url: string, token?: string, payload?: object) {
+      const app = await buildApp();
+      const response = await app.inject({
+        method,
+        url,
+        payload,
+        headers: token ? { authorization: `Bearer ${token}` } : {},
+      });
+      await app.close();
+      return response;
+    }
+
+    it('PATCH /admin/catalog/products/:id edita (200) e repassa id numérico + campos', async () => {
+      updateCatalogProduct.mockResolvedValue({ id: 1131709, name: 'Novo' });
+
+      const response = await call('PATCH', '/admin/catalog/products/1131709', ADMIN_TOKEN, {
+        name: 'Novo nome',
+        basePrice: 59.9,
+      });
+
+      expect(response.statusCode).toBe(200);
+      expect(updateCatalogProduct).toHaveBeenCalledWith(1131709, {
+        name: 'Novo nome',
+        basePrice: 59.9,
+      });
+    });
+
+    it('PATCH recusa corpo vazio (400), não-admin (403) e sem login (401)', async () => {
+      const url = '/admin/catalog/products/1';
+      expect((await call('PATCH', url, ADMIN_TOKEN, {})).statusCode).toBe(400);
+      expect((await call('PATCH', url, USER_TOKEN, { name: 'Novo' })).statusCode).toBe(403);
+      expect((await call('PATCH', url, undefined, { name: 'Novo' })).statusCode).toBe(401);
+      expect(updateCatalogProduct).not.toHaveBeenCalled();
+    });
+
+    it('DELETE /admin/catalog/products/:id remove (204); ?force=true repassa o force', async () => {
+      deleteCatalogProduct.mockResolvedValue(undefined);
+
+      expect((await call('DELETE', '/admin/catalog/products/7', ADMIN_TOKEN)).statusCode).toBe(204);
+      expect(deleteCatalogProduct).toHaveBeenLastCalledWith(7, false);
+
+      await call('DELETE', '/admin/catalog/products/7?force=true', ADMIN_TOKEN);
+      expect(deleteCatalogProduct).toHaveBeenLastCalledWith(7, true);
+    });
+
+    it('DELETE: 403 para quem não é admin', async () => {
+      expect((await call('DELETE', '/admin/catalog/products/7', USER_TOKEN)).statusCode).toBe(403);
+      expect(deleteCatalogProduct).not.toHaveBeenCalled();
+    });
   });
 });

@@ -27,7 +27,6 @@ import { Banner, Field, MoneyField, PageHeader, TextInput } from '@/components/p
 type CartLine = { item: StoreProduct; quantity: number };
 
 const CUSTOMER_NAME_MAX = 120;
-const MAX_INSTALLMENTS = 24;
 const MAX_CART_ITEMS = 50;
 const SEARCH_DEBOUNCE_MS = 350;
 const RESULTS_LIMIT = 6;
@@ -39,7 +38,6 @@ export default function NewSalePage() {
 
   const [customerName, setCustomerName] = useState('');
   const [paymentMethod, setPaymentMethod] = useState<NewSalePaymentMethod>('pix');
-  const [installments, setInstallments] = useState(1);
   const [cart, setCart] = useState<CartLine[]>([]);
   const [nameError, setNameError] = useState<string | null>(null);
   const [formError, setFormError] = useState<string | null>(null);
@@ -155,7 +153,6 @@ export default function NewSalePage() {
   function resetForm() {
     setCustomerName('');
     setPaymentMethod('pix');
-    setInstallments(1);
     setCart([]);
     setProductQuery('');
     setNameError(null);
@@ -185,7 +182,6 @@ export default function NewSalePage() {
     const content: Omit<CreateSaleInput, 'clientRequestId'> = {
       customerName: name,
       paymentMethod,
-      ...(paymentMethod === 'card' ? { installments } : {}),
       items: cart.map((line) => ({ storeProductId: line.item.id, quantity: line.quantity })),
     };
 
@@ -259,34 +255,6 @@ export default function NewSalePage() {
               })}
             </div>
 
-            {paymentMethod === 'card' && (
-              <div className="mt-3 flex h-12 items-center justify-between rounded-xl bg-ink-50 px-4">
-                <span className="text-sm text-ink-700">Parcelas</span>
-                <div className="flex items-center gap-1">
-                  <button
-                    type="button"
-                    onClick={() => setInstallments((value) => Math.max(1, value - 1))}
-                    disabled={installments <= 1 || loading}
-                    aria-label="Diminuir parcelas"
-                    className="flex h-8 w-8 items-center justify-center rounded-full text-ink-700 transition hover:bg-ink-100 disabled:opacity-40"
-                  >
-                    <Icon name="minus" size={14} strokeWidth={2.4} />
-                  </button>
-                  <span className="min-w-16 text-center text-sm font-bold text-ink-900">
-                    {installments === 1 ? 'à vista' : `${installments}x`}
-                  </span>
-                  <button
-                    type="button"
-                    onClick={() => setInstallments((value) => Math.min(MAX_INSTALLMENTS, value + 1))}
-                    disabled={installments >= MAX_INSTALLMENTS || loading}
-                    aria-label="Aumentar parcelas"
-                    className="flex h-8 w-8 items-center justify-center rounded-full bg-primary-500 text-white transition hover:bg-primary-600 disabled:opacity-40"
-                  >
-                    <Icon name="plus" size={14} strokeWidth={2.4} />
-                  </button>
-                </div>
-              </div>
-            )}
           </section>
 
           <section className="relative rounded-2xl border border-ink-100 bg-white p-5">

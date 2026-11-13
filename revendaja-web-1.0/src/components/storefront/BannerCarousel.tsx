@@ -45,11 +45,16 @@ export function BannerCarousel({
 
   if (count === 0) return null;
 
+  // Só vira vertical (9:16) no celular se TODOS os banners têm a arte vertical; senão o carrossel
+  // ficaria com alturas diferentes por slide. Sem arte vertical, o celular usa a larga, em quadrado.
+  const portrait = banners.every((banner) => Boolean(banner.mobileImageUrl));
+
   return (
     <section
       aria-roledescription="carrossel"
       aria-label="Destaques da loja"
-      className="group relative overflow-hidden rounded-2xl bg-ink-100 ring-1 ring-ink-100"
+      // No celular o banner é quadrado e vai de ponta a ponta da tela (sai do padding da página); no desktop volta ao formato largo.
+      className="group relative -mx-4 -mt-5 overflow-hidden bg-ink-100 sm:mx-0 sm:mt-0 sm:rounded-2xl sm:ring-1 sm:ring-ink-100"
       onMouseEnter={() => setPaused(true)}
       onMouseLeave={() => setPaused(false)}
       onFocus={() => setPaused(true)}
@@ -61,15 +66,18 @@ export function BannerCarousel({
       >
         {banners.map((banner, position) => {
           const active = position === current;
-          const picture = (
-            <SafeImage
-              src={banner.imageUrl}
-              alt={`${storeName}: banner ${position + 1} de ${count}`}
-              // O primeiro banner é o que aparece ao abrir a página: carrega já. Os outros esperam.
-              loading={position === 0 ? 'eager' : 'lazy'}
-              className="h-full w-full object-cover"
-              fallback={<span className="block h-full w-full bg-gradient-to-br from-primary-100 to-primary-50" />}
-            />
+          const alt = `${storeName}: banner ${position + 1} de ${count}`;
+          // O primeiro banner é o que aparece ao abrir a página: carrega já. Os outros esperam.
+          const loading = position === 0 ? 'eager' : 'lazy';
+          const fallback = <span className="block h-full w-full bg-gradient-to-br from-primary-100 to-primary-50" />;
+          const picture = banner.mobileImageUrl ? (
+            // Celular: arte vertical. A partir de `sm` (640px): arte larga.
+            <picture className="block h-full w-full">
+              <source media="(min-width: 640px)" srcSet={banner.imageUrl} />
+              <SafeImage src={banner.mobileImageUrl} alt={alt} loading={loading} className="h-full w-full object-cover" fallback={fallback} />
+            </picture>
+          ) : (
+            <SafeImage src={banner.imageUrl} alt={alt} loading={loading} className="h-full w-full object-cover" fallback={fallback} />
           );
           return (
             <div
@@ -80,7 +88,7 @@ export function BannerCarousel({
               // Slide fora da tela não recebe foco nem é lido pelo leitor de tela.
               inert={!active}
               aria-hidden={!active}
-              className="aspect-[2/1] w-full shrink-0 sm:aspect-[16/5]"
+              className={`w-full shrink-0 sm:aspect-[3/1] ${portrait ? 'aspect-[9/16]' : 'aspect-square'}`}
             >
               {banner.link ? (
                 <button

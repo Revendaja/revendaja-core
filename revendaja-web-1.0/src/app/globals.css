@@ -177,3 +177,39 @@ body {
     linear-gradient(to right, #000 78%, transparent 100%);
   mask-composite: intersect;
 }
+
+/* Vitrine: letreiro da barra de aviso. O trilho tem 2 cópias do texto; andar 50% volta ao mesmo ponto. */
+@keyframes announcement-scroll {
+  to {
+    transform: translateX(-50%);
+  }
+}
+
+.announcement-track {
+  display: flex;
+  width: max-content;
+  animation: announcement-scroll 18s linear infinite;
+}
+
+/* Cópia do texto que fecha o laço, com um respiro antes. O trilho tem texto + cópia: andar 50% volta ao início. */
+.announcement-text::after {
+  content: attr(data-text);
+  padding-left: 4rem;
+}
+
+.announcement-text {
+  padding-right: 4rem;
+}
+
+.announcement-marquee:hover .announcement-track {
+  animation-play-state: paused;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .announcement-track {
+    animation: none;
+  }
+  .announcement-text::after {
+    display: none;
+  }
+}

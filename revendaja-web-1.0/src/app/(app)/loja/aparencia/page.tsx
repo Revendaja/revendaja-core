@@ -329,6 +329,14 @@ function BannersForm({
               onChange={(imageUrl) => imageUrl && setItem(index, { imageUrl })}
               removable={false}
             />
+            <ImageField
+              label={`Imagem do banner ${index + 1} no celular (opcional)`}
+              hint="Versão vertical para o celular, formato 9:16 (ex.: 1080 × 1920). Sem ela, o celular usa a imagem larga."
+              value={item.mobileImageUrl ?? null}
+              onChange={(mobileImageUrl) => setItem(index, { mobileImageUrl })}
+              emptyLabel="Usa a imagem larga"
+              removeLabel="Usar a imagem larga"
+            />
             <Field label="Ao clicar, leva para" hint={index === 0 && categories.length === 0 ? 'Crie categorias em "Meus produtos" para poder apontar para elas.' : undefined}>
               <SelectInput
                 label={`Destino do banner ${index + 1}`}

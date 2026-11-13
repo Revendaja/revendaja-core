@@ -23,13 +23,29 @@ export const imageUrl = z
     message: 'Use uma imagem enviada pelo painel.',
   });
 
-// Banners de exemplo (fotos públicas) que a vitrine mostra até a loja enviar os dela. São os únicos
-// links externos aceitos nos banners: o resto precisa vir do upload do painel.
-export const DEFAULT_BANNER_IMAGES = [
+// Banners padrão que a vitrine mostra até a loja enviar os dela. As artes ficam em `public/banners`
+// do revendaja-web (caminho relativo ao site da vitrine). Cada banner tem a versão larga (desktop)
+// e a vertical (celular). Para trocar/adicionar um padrão: ponha as duas imagens lá e liste aqui.
+export const DEFAULT_BANNERS = [
+  {
+    desktop: '/banners/floratta-gold-desktop.webp',
+    mobile: '/banners/floratta-gold-mobile.webp',
+    link: { type: 'section', section: 'catalog' },
+  },
+] as const;
+
+// Fotos de exemplo antigas: lojas que as salvaram ao editar os banners ainda precisam validar.
+const LEGACY_BANNER_IMAGES = [
   'https://images.unsplash.com/photo-1596462502278-27bfdc403348?auto=format&fit=crop&w=1920&h=600&q=75',
   'https://images.unsplash.com/photo-1487412947147-5cebf100ffc2?auto=format&fit=crop&w=1920&h=600&q=75',
   'https://images.unsplash.com/photo-1522335789203-aabd1fc54bc9?auto=format&fit=crop&w=1920&h=600&q=75',
 ] as const;
+
+// Únicos valores aceitos além de uploads da própria loja: as artes padrão e as antigas de exemplo.
+export const DEFAULT_BANNER_IMAGES = [
+  ...DEFAULT_BANNERS.flatMap((banner) => [banner.desktop, banner.mobile]),
+  ...LEGACY_BANNER_IMAGES,
+] as unknown as [string, ...string[]];
 
 export const MAX_BANNERS = 5;
 
@@ -68,6 +84,8 @@ const bannerImageSchema = z.union([imageUrl, z.enum(DEFAULT_BANNER_IMAGES)]);
 
 const bannerSchema = z.object({
   imageUrl: bannerImageSchema,
+  // Versão vertical para o celular. Ausente/null = o celular usa `imageUrl`.
+  mobileImageUrl: bannerImageSchema.nullish(),
   // Para onde o clique leva (seção, categoria ou marca). null = banner só de enfeite.
   link: collectionLinkSchema.nullable(),
 });
@@ -141,11 +159,11 @@ export function buildDefaultConfig(storeName: string): StorefrontConfig {
       text: `Bem-vinda à ${storeName}! Escolha seus produtos e faça o pedido pelo site.`,
       rightText: null,
     },
-    banners: [
-      { imageUrl: DEFAULT_BANNER_IMAGES[0], link: { type: 'section', section: 'offers' } },
-      { imageUrl: DEFAULT_BANNER_IMAGES[1], link: { type: 'section', section: 'new' } },
-      { imageUrl: DEFAULT_BANNER_IMAGES[2], link: { type: 'section', section: 'catalog' } },
-    ],
+    banners: DEFAULT_BANNERS.map((banner) => ({
+      imageUrl: banner.desktop,
+      mobileImageUrl: banner.mobile,
+      link: { ...banner.link },
+    })),
     hero: {
       badge: 'NOVIDADES DA LOJA',
       title: 'Beleza e cuidado',
