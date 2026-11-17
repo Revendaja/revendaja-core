@@ -59,6 +59,11 @@ export function updateSale(id: string, input: UpdateSaleInput) {
   return request<SaleDetail>(`/sales/${id}`, { method: 'PUT', body: input, auth: true });
 }
 
+// Remove a venda de vez. Pendente devolve o estoque reservado; paga ou cancelada só é apagada (204).
+export function deleteSale(id: string) {
+  return request<null>(`/sales/${id}`, { method: 'DELETE', auth: true });
+}
+
 // Só vendas PENDENTES podem mudar de status. "paid" = a loja recebeu; "cancelled" = devolve o estoque reservado.
 export function markSalePaid(id: string) {
   return request<SaleDetail>(`/sales/${id}`, { method: 'PATCH', body: { status: 'paid' }, auth: true });

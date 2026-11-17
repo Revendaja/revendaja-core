@@ -1,9 +1,9 @@
 'use client';
 
 import { useState } from 'react';
-import { useParams } from 'next/navigation';
+import { useParams, useRouter } from 'next/navigation';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { cancelSale, getSale, markSalePaid, updateSale } from '@/lib/api/sales';
+import { cancelSale, deleteSale, getSale, markSalePaid, updateSale } from '@/lib/api/sales';
 import { queryKeys } from '@/lib/api/queryKeys';
 import { useAuth } from '@/lib/auth/AuthContext';
 import { ApiError, getErrorMessage } from '@/lib/api/errors';
@@ -28,10 +28,12 @@ function toInputDate(date: Date): string {
 
 export default function SaleDetailPage() {
   const params = useParams<{ id: string }>();
+  const router = useRouter();
   const queryClient = useQueryClient();
   const { store } = useAuth();
   const [actionError, setActionError] = useState<string | null>(null);
   const [cancelConfirming, setCancelConfirming] = useState(false);
+  const [deleteConfirming, setDeleteConfirming] = useState(false);
 
   const [editing, setEditing] = useState(false);
   const [editError, setEditError] = useState<string | null>(null);
@@ -67,6 +69,21 @@ export default function SaleDetailPage() {
     onError: (error) => {
       setActionError(getErrorMessage(error));
       setCancelConfirming(false);
+    },
+  });
+
+  const deleteMutation = useMutation({
+    mutationFn: () => deleteSale(params.id),
+    onSuccess: () => {
+      queryClient.removeQueries({ queryKey: queryKeys.saleDetail(params.id) });
+      void queryClient.invalidateQueries({ queryKey: queryKeys.sales() });
+      void queryClient.invalidateQueries({ queryKey: queryKeys.home() });
+      void queryClient.invalidateQueries({ queryKey: queryKeys.allStoreProducts() });
+      router.replace('/vendas');
+    },
+    onError: (error) => {
+      setActionError(getErrorMessage(error));
+      setDeleteConfirming(false);
     },
   });
 
@@ -123,6 +140,14 @@ export default function SaleDetailPage() {
           }}
           onCancelCancel={() => setCancelConfirming(false)}
           onConfirmCancel={() => cancelMutation.mutate()}
+          deleting={deleteMutation.isPending}
+          deleteConfirming={deleteConfirming}
+          onAskDelete={() => {
+            setActionError(null);
+            setDeleteConfirming(true);
+          }}
+          onCancelDelete={() => setDeleteConfirming(false)}
+          onConfirmDelete={() => deleteMutation.mutate()}
           editing={editing}
           editError={editError}
           saving={updateMutation.isPending}
@@ -152,6 +177,11 @@ function SaleView({
   onAskCancel,
   onCancelCancel,
   onConfirmCancel,
+  deleting,
+  deleteConfirming,
+  onAskDelete,
+  onCancelDelete,
+  onConfirmDelete,
   editing,
   editError,
   saving,
@@ -159,6 +189,11 @@ function SaleView({
   onCancelEdit,
   onSaveEdit,
 }: {
+  deleting: boolean;
+  deleteConfirming: boolean;
+  onAskDelete: () => void;
+  onCancelDelete: () => void;
+  onConfirmDelete: () => void;
   // Nome da loja, para a mensagem pronta do WhatsApp.
   storeName: string | null;
   editing: boolean;
@@ -376,6 +411,47 @@ function SaleView({
         )}
 
         {editing && <EditSaleForm sale={sale} error={editError} saving={saving} onCancel={onCancelEdit} onSave={onSaveEdit} />}
+
+        {!deleteConfirming && (
+          <button
+            type="button"
+            onClick={onAskDelete}
+            disabled={busy || deleting}
+            className="flex h-12 items-center justify-center gap-1.5 rounded-xl text-sm font-semibold text-danger transition hover:bg-danger-soft disabled:cursor-not-allowed disabled:opacity-60"
+          >
+            <Icon name="trash" size={16} />
+            Excluir venda
+          </button>
+        )}
+
+        {deleteConfirming && (
+          <div className="animate-fade-up rounded-2xl border border-danger/30 bg-danger-soft p-4">
+            <p className="text-xs font-semibold text-danger">Excluir esta venda?</p>
+            <p className="mt-1 text-xs text-danger/80">
+              {isPending
+                ? 'O pedido some do histórico e o estoque reservado volta para a sua loja. Isso não pode ser desfeito.'
+                : 'A venda some do histórico e dos totais. O estoque não muda. Isso não pode ser desfeito.'}
+            </p>
+            <div className="mt-3 flex gap-2">
+              <button
+                type="button"
+                onClick={onCancelDelete}
+                disabled={deleting}
+                className="h-9 flex-1 rounded-lg border border-ink-200 bg-white text-xs font-semibold text-ink-700 transition hover:bg-ink-50 disabled:opacity-60"
+              >
+                Voltar
+              </button>
+              <button
+                type="button"
+                onClick={onConfirmDelete}
+                disabled={deleting}
+                className="h-9 flex-1 rounded-lg bg-danger text-xs font-semibold text-white transition hover:bg-danger/90 disabled:opacity-60"
+              >
+                {deleting ? 'Excluindo...' : 'Excluir'}
+              </button>
+            </div>
+          </div>
+        )}
       </aside>
     </div>
   );
