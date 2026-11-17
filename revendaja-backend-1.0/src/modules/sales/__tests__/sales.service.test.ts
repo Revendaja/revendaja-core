@@ -17,6 +17,7 @@ function createRepositoryMock(): jest.Mocked<SalesRepository> {
     countBySource: jest.fn(),
     cancel: jest.fn(),
     remove: jest.fn(),
+    updateDetails: jest.fn(),
     findExpiredOnlineOrders: jest.fn(),
     summaryData: jest.fn(),
     topProducts: jest.fn(),
@@ -57,6 +58,8 @@ function buildSale(overrides: Partial<Sale> = {}): Sale {
     fulfillment: null,
     deliveryAddress: null,
     cashChangeFor: null,
+    discount: 0,
+    couponCode: null,
     items: [],
     ...overrides,
   };
@@ -83,6 +86,82 @@ function build() {
 }
 
 describe('SalesService', () => {
+  describe('update', () => {
+    const SALE_ID = '11111111-1111-4111-8111-111111111111';
+
+    it('404 quando a venda não existe', async () => {
+      const { repository, service } = build();
+      repository.findById.mockResolvedValue(null);
+
+      await expect(
+        service.update('user-1', SALE_ID, { customerName: 'Bia' }),
+      ).rejects.toBeInstanceOf(NotFoundError);
+    });
+
+    it('409 em venda cancelada', async () => {
+      const { repository, service } = build();
+      repository.findById.mockResolvedValue(buildSale({ status: 'cancelled' }));
+
+      await expect(
+        service.update('user-1', SALE_ID, { customerName: 'Bia' }),
+      ).rejects.toBeInstanceOf(ConflictError);
+      expect(repository.updateDetails).not.toHaveBeenCalled();
+    });
+
+    it('grava só o nome e a data quando só eles vêm', async () => {
+      const { repository, service } = build();
+      const soldAt = new Date('2026-10-01T12:00:00.000Z');
+      repository.findById.mockResolvedValue(buildSale());
+      repository.updateDetails.mockResolvedValue(buildSale({ customerName: 'Bia' }));
+
+      await service.update('user-1', SALE_ID, { customerName: 'Bia', soldAt });
+
+      expect(repository.updateDetails).toHaveBeenCalledWith('store-1', SALE_ID, {
+        customerName: 'Bia',
+        soldAt,
+      });
+    });
+
+    it('trocar para cartão sem parcelas = 1x', async () => {
+      const { repository, service } = build();
+      repository.findById.mockResolvedValue(buildSale({ paymentMethod: 'pix' }));
+      repository.updateDetails.mockResolvedValue(buildSale());
+
+      await service.update('user-1', SALE_ID, { paymentMethod: 'card' });
+
+      expect(repository.updateDetails).toHaveBeenCalledWith('store-1', SALE_ID, {
+        paymentMethod: 'card',
+        installments: 1,
+      });
+    });
+
+    it('sair do cartão zera as parcelas', async () => {
+      const { repository, service } = build();
+      repository.findById.mockResolvedValue(buildSale({ paymentMethod: 'card', installments: 3 }));
+      repository.updateDetails.mockResolvedValue(buildSale());
+
+      await service.update('user-1', SALE_ID, { paymentMethod: 'pix' });
+
+      expect(repository.updateDetails).toHaveBeenCalledWith('store-1', SALE_ID, {
+        paymentMethod: 'pix',
+        installments: null,
+      });
+    });
+
+    it('400 ao informar parcelas fora do cartão', async () => {
+      const { repository, service } = build();
+      repository.findById.mockResolvedValue(buildSale({ paymentMethod: 'pix' }));
+
+      const error = await service
+        .update('user-1', SALE_ID, { installments: 2 })
+        .catch((e: unknown) => e);
+
+      expect(error).toBeInstanceOf(AppError);
+      expect((error as AppError).statusCode).toBe(400);
+      expect(repository.updateDetails).not.toHaveBeenCalled();
+    });
+  });
+
   describe('create', () => {
     it('lança NotFoundError quando a usuária não tem loja', async () => {
       const { stores, service } = build();
@@ -634,6 +713,73 @@ describe('SalesService', () => {
     });
   });
 
+  describe('create (cupom) / summary com cupom', () => {
+    it('desconto de cupom abate o lucro e a receita dos itens com custo', async () => {
+      const { repository, service } = build();
+      repository.summaryData.mockResolvedValue({
+        paidCents: 9000,
+        pendingCents: 0,
+        paidItems: [{ unitPriceCents: 10000, unitCostCents: 6000, quantity: 1 }],
+        paidDiscountCents: 1000,
+      });
+
+      const summary = await service.summary(
+        'user-1',
+        new Date('2026-09-01T03:00:00.000Z'),
+        new Date('2026-10-01T03:00:00.000Z'),
+      );
+
+      // (100 - 60) - 10 de cupom = 30 de lucro, sobre 90 de receita
+      expect(summary.profit).toBe(30);
+      expect(summary.marginPercent).toBe(33.33);
+      expect(summary.grossRevenue).toBe(90);
+    });
+
+    it('cupom recusado vira 400 COUPON_INVALID com a mensagem do motivo', async () => {
+      const { repository, service } = build();
+      repository.createSale.mockResolvedValue({
+        kind: 'coupon_invalid',
+        message: 'Cupom inválido ou expirado.',
+      });
+
+      const error = await service
+        .createOnlineOrder('store-1', {
+          clientRequestId: '44444444-4444-4444-8444-444444444444',
+          customerName: 'Bia',
+          customerWhatsapp: '11987654321',
+          fulfillment: 'pickup',
+          paymentMethod: 'pix',
+          couponCode: 'VERAO10',
+          items: [{ storeProductId: PRODUCT_A, quantity: 1 }],
+        })
+        .catch((e: unknown) => e);
+
+      expect(error).toBeInstanceOf(AppError);
+      expect((error as AppError).code).toBe('COUPON_INVALID');
+      expect((error as AppError).statusCode).toBe(400);
+      expect((error as AppError).message).toBe('Cupom inválido ou expirado.');
+    });
+
+    it('o código do cupom segue para a transação do pedido', async () => {
+      const { repository, service } = build();
+      repository.createSale.mockResolvedValue({ kind: 'created', sale: buildSale() });
+
+      await service.createOnlineOrder('store-1', {
+        clientRequestId: '44444444-4444-4444-8444-444444444444',
+        customerName: 'Bia',
+        customerWhatsapp: '11987654321',
+        fulfillment: 'pickup',
+        paymentMethod: 'pix',
+        couponCode: 'VERAO10',
+        items: [{ storeProductId: PRODUCT_A, quantity: 1 }],
+      });
+
+      expect(repository.createSale).toHaveBeenCalledWith(
+        expect.objectContaining({ couponCode: 'VERAO10' }),
+      );
+    });
+  });
+
   describe('summary', () => {
     const FROM = new Date('2026-09-01T03:00:00.000Z');
     const TO = new Date('2026-10-01T03:00:00.000Z');
@@ -644,6 +790,7 @@ describe('SalesService', () => {
         paidCents: 0,
         pendingCents: 0,
         paidItems: [],
+        paidDiscountCents: 0,
         ...data,
       });
       const result = await service.summary('user-1', FROM, TO);

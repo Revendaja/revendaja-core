@@ -167,6 +167,7 @@ model Store {
   storeProducts     StoreProduct[]
   storeCategories   StoreCategory[]
   sales             Sale[]
+  coupons           Coupon[]
   visits            StoreVisit[]
   goalNotifications StoreGoalNotification[]
   aiConversations   AiConversation[]
@@ -344,6 +345,12 @@ enum SaleSource {
   online
 }
 
+// Desconto do cupom: `percent` = % sobre o total dos produtos; `fixed` = valor em reais.
+enum CouponType {
+  percent
+  fixed
+}
+
 /// Como o cliente recebe o pedido feito na vitrine: busca na loja ou a loja entrega.
 enum FulfillmentMethod {
   pickup
@@ -354,6 +361,35 @@ enum FulfillmentMethod {
 /// do preço vigente dos produtos. `clientRequestId` (gerado pelo app) torna a
 /// criação idempotente: repetir a chamada devolve a mesma venda em vez de duplicar.
 /// `number` é a sequência por loja ("Venda #42").
+/// Cupom de desconto da loja. O cliente digita o `code` no carrinho da vitrine; o servidor confere tudo
+/// (ativo, validade, pedido mínimo, limite de usos) e abate o desconto do total do pedido.
+model Coupon {
+  id        String     @id @default(uuid())
+  storeId   String     @map("store_id")
+  // Sempre em MAIÚSCULAS, sem espaços: "VERAO10". Único por loja.
+  code      String
+  type      CouponType
+  // percent: 1 a 100 (%); fixed: valor em reais.
+  value     Decimal    @db.Decimal(10, 2)
+  // Pedido mínimo (soma dos produtos) para o cupom valer. null = sem mínimo.
+  minOrder  Decimal?   @map("min_order") @db.Decimal(10, 2)
+  // Quantas vezes pode ser usado no total. null = ilimitado. Pedido cancelado devolve o uso.
+  maxUses   Int?       @map("max_uses")
+  usedCount Int        @default(0) @map("used_count")
+  // Último instante em que vale. null = não expira.
+  expiresAt DateTime?  @map("expires_at")
+  isActive  Boolean    @default(true) @map("is_active")
+  createdAt DateTime   @default(now()) @map("created_at")
+  updatedAt DateTime   @updatedAt @map("updated_at")
+
+  store Store  @relation(fields: [storeId], references: [id], onDelete: Cascade)
+  sales Sale[]
+
+  @@unique([storeId, code])
+  @@index([storeId, createdAt])
+  @@map("coupons")
+}
+
 model Sale {
   id               String        @id @default(uuid())
   storeId          String        @map("store_id")
@@ -372,16 +408,23 @@ model Sale {
   deliveryAddress  String?       @map("delivery_address")
   // Entrega paga em dinheiro: "troco para quanto" (nota que o cliente vai entregar). null = não precisa de troco.
   cashChangeFor    Decimal?      @map("cash_change_for") @db.Decimal(12, 2)
+  // Desconto de cupom já abatido do `total` (total = soma dos itens - discount). 0 = sem cupom.
+  discount         Decimal       @default(0) @db.Decimal(12, 2)
+  // Cupom usado. `couponCode` é uma cópia do código da hora (sobrevive se o cupom for apagado).
+  couponId         String?       @map("coupon_id")
+  couponCode       String?       @map("coupon_code")
   total            Decimal       @db.Decimal(12, 2)
   createdAt        DateTime      @default(now()) @map("created_at")
 
-  store Store      @relation(fields: [storeId], references: [id], onDelete: Cascade)
-  items SaleItem[]
+  store  Store      @relation(fields: [storeId], references: [id], onDelete: Cascade)
+  coupon Coupon?    @relation(fields: [couponId], references: [id], onDelete: SetNull)
+  items  SaleItem[]
 
   @@unique([storeId, number])
   @@unique([storeId, clientRequestId])
   @@index([storeId, createdAt])
   @@index([storeId, source])
+  @@index([couponId])
   // Cancelamento automático: acha rápido os pedidos online pendentes e antigos, de todas as lojas.
   @@index([status, source, createdAt])
   @@map("sales")

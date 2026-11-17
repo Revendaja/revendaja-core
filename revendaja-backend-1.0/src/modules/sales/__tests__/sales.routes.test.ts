@@ -9,6 +9,7 @@ const saleFindMany = jest.fn();
 const saleCount = jest.fn();
 const saleUpdateMany = jest.fn();
 const saleGroupBy = jest.fn();
+const saleAggregate = jest.fn();
 const saleItemFindMany = jest.fn();
 const storeProductFindMany = jest.fn();
 const transaction = jest.fn();
@@ -21,7 +22,10 @@ const txStoreProductFindUnique = jest.fn();
 const txSaleCreate = jest.fn();
 const txSaleUpdateMany = jest.fn();
 const txSaleFindFirst = jest.fn();
+const txSaleFindUnique = jest.fn();
 const txSaleItemFindMany = jest.fn();
+const txCouponFindUnique = jest.fn();
+const txCouponUpdateMany = jest.fn();
 
 jest.mock('../../../database/prisma', () => ({
   prisma: {
@@ -37,6 +41,7 @@ jest.mock('../../../database/prisma', () => ({
       count: (...args: unknown[]) => saleCount(...args),
       updateMany: (...args: unknown[]) => saleUpdateMany(...args),
       groupBy: (...args: unknown[]) => saleGroupBy(...args),
+      aggregate: (...args: unknown[]) => saleAggregate(...args),
     },
     saleItem: { findMany: (...args: unknown[]) => saleItemFindMany(...args) },
     storeProduct: { findMany: (...args: unknown[]) => storeProductFindMany(...args) },
@@ -96,6 +101,9 @@ function buildSaleRow(overrides: Record<string, unknown> = {}) {
     fulfillment: null,
     deliveryAddress: null,
     cashChangeFor: null,
+    discount: money(0),
+    couponId: null,
+    couponCode: null,
     total: money(110),
     createdAt: new Date('2026-09-23T15:00:00.000Z'),
     items: [
@@ -170,6 +178,7 @@ beforeEach(() => {
     saleCount,
     saleUpdateMany,
     saleGroupBy,
+    saleAggregate,
     saleItemFindMany,
     storeProductFindMany,
     transaction,
@@ -180,10 +189,17 @@ beforeEach(() => {
     txSaleCreate,
     txSaleUpdateMany,
     txSaleFindFirst,
+    txSaleFindUnique,
     txSaleItemFindMany,
+    txCouponFindUnique,
+    txCouponUpdateMany,
   ].forEach((mock) => mock.mockReset());
 
   sessionFindUnique.mockResolvedValue(buildTestSession(USER_ID));
+  // Sem cupom por padrão: nenhum desconto nas vendas pagas e o pedido cancelado não tem cupom para devolver.
+  saleAggregate.mockResolvedValue({ _sum: { discount: null } });
+  txSaleFindUnique.mockResolvedValue({ couponId: null });
+  txCouponUpdateMany.mockResolvedValue({ count: 1 });
   // O Prisma real desfaz a transação quando o callback lança: aqui a promise
   // rejeita do mesmo jeito.
   transaction.mockImplementation((callback: (tx: unknown) => unknown) =>
@@ -194,8 +210,14 @@ beforeEach(() => {
         updateMany: txStoreProductUpdateMany,
         findUnique: txStoreProductFindUnique,
       },
-      sale: { create: txSaleCreate, updateMany: txSaleUpdateMany, findFirst: txSaleFindFirst },
+      sale: {
+        create: txSaleCreate,
+        updateMany: txSaleUpdateMany,
+        findFirst: txSaleFindFirst,
+        findUnique: txSaleFindUnique,
+      },
       saleItem: { findMany: txSaleItemFindMany },
+      coupon: { findUnique: txCouponFindUnique, updateMany: txCouponUpdateMany },
     }),
   );
 });
@@ -994,6 +1016,28 @@ describe('PATCH /sales/:id { status: "cancelled" } (cancela o pedido e devolve o
       buildSaleRow({ status: finalStatus, source: 'online', customerWhatsapp: '5511987654321' }),
     );
   }
+
+  it('cancelar um pedido que usou cupom devolve o uso do cupom', async () => {
+    arrangeCancel({ count: 1, finalStatus: 'cancelled' });
+    txSaleFindUnique.mockResolvedValue({ couponId: 'coupon-1' });
+
+    const response = await request('PATCH', `/sales/${SALE_ID}`, { status: 'cancelled' });
+
+    expect(response.statusCode).toBe(200);
+    expect(txCouponUpdateMany).toHaveBeenCalledWith({
+      where: { id: 'coupon-1', usedCount: { gt: 0 } },
+      data: { usedCount: { decrement: 1 } },
+    });
+  });
+
+  it('cancelar de novo (já cancelado) NÃO devolve o uso do cupom outra vez', async () => {
+    arrangeCancel({ count: 0, finalStatus: 'cancelled' });
+    txSaleFindUnique.mockResolvedValue({ couponId: 'coupon-1' });
+
+    await request('PATCH', `/sales/${SALE_ID}`, { status: 'cancelled' });
+
+    expect(txCouponUpdateMany).not.toHaveBeenCalled();
+  });
 
   it('cancela o pedido PENDENTE: 200 com status cancelled', async () => {
     arrangeCancel({ count: 1, finalStatus: 'cancelled' });

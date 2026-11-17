@@ -18,6 +18,7 @@ import {
   topBrandsResponseSchema,
   topProductsQuerySchema,
   topProductsResponseSchema,
+  updateSaleSchema,
   updateSaleStatusSchema,
 } from './sales.schema';
 import {
@@ -30,6 +31,7 @@ import {
   getTopBrands,
   getTopProducts,
   listSales,
+  updateSale,
   updateSaleStatus,
 } from './sales.controller';
 
@@ -183,6 +185,23 @@ export async function salesRoutes(app: FastifyInstance): Promise<void> {
       },
     },
     updateSaleStatus,
+  );
+
+  server.put(
+    '/sales/:id',
+    {
+      preHandler: [authenticate, VERIFIED],
+      schema: {
+        tags: ['sales'],
+        summary:
+          'Edita os dados de uma venda (cliente, forma de pagamento/parcelas e data). Não altera itens, total nem estoque. Venda cancelada não edita.',
+        security: [{ bearerAuth: [] }],
+        params: saleParamsSchema,
+        body: updateSaleSchema,
+        response: { 200: saleResponseSchema },
+      },
+    },
+    updateSale,
   );
 
   server.delete(

@@ -10,6 +10,7 @@ import type {
   SaleStatusValue,
   StaleProduct,
   TopProduct,
+  UpdateSaleInput,
 } from './types';
 
 export const SALES_PAGE_SIZE = 20;
@@ -52,6 +53,11 @@ export function getSale(id: string) {
 // já cancelada devolve 200 igual, sem devolver o estoque de novo.
 export function cancelSale(id: string) {
   return request<SaleDetail>(`/sales/${id}`, { method: 'PATCH', body: { status: 'cancelled' }, auth: true });
+}
+
+// Edita cliente, forma de pagamento/parcelas e data. Venda cancelada não edita (409).
+export function updateSale(id: string, input: UpdateSaleInput) {
+  return request<SaleDetail>(`/sales/${id}`, { method: 'PUT', body: input, auth: true });
 }
 
 // Remove a venda de vez. Pendente devolve o estoque reservado; paga ou cancelada só é apagada (204).

@@ -1,7 +1,7 @@
 import type { Prisma } from '@prisma/client';
 import { prisma } from '../../database/prisma';
 import { buildProductSearchFilter, findFuzzyStoreProductIds } from '../catalog/catalog.search';
-import type { StorefrontCategory, StorefrontProduct } from './storefront.types';
+import type { StorefrontBrand, StorefrontCategory, StorefrontProduct } from './storefront.types';
 
 interface ListProductsFilter {
   // Loja configurada para esconder o produto com estoque zerado.
@@ -135,6 +135,73 @@ export const storefrontRepository = {
 
   // Atalhos de categoria: as categorias próprias da loja e as marcas dos produtos, só as que têm
   // produto visível, da maior para a menor.
+  // Um produto visível da vitrine (a página de detalhes). null = não existe, está oculto/congelado
+  // ou (se a loja esconde os esgotados) sem estoque.
+  async getProduct(
+    storeId: string,
+    productId: string,
+    hideOutOfStock: boolean,
+  ): Promise<StorefrontProduct | null> {
+    const row = await prisma.storeProduct.findFirst({
+      where: { ...visibleWhere(storeId, hideOutOfStock), id: productId },
+      select: PRODUCT_SELECT,
+    });
+    return row ? mapProduct(row, new Date()) : null;
+  },
+
+  // "Quem viu também gostou": outros produtos visíveis da mesma categoria da loja ou da mesma marca.
+  async listRelated(
+    storeId: string,
+    productId: string,
+    hideOutOfStock: boolean,
+    limit: number,
+  ): Promise<StorefrontProduct[]> {
+    const base = await prisma.storeProduct.findFirst({
+      where: { id: productId, storeId },
+      select: { categoryId: true, product: { select: { brandId: true } } },
+    });
+    const matches: Prisma.StoreProductWhereInput[] = [];
+    if (base?.categoryId) matches.push({ categoryId: base.categoryId });
+    if (base?.product) matches.push({ product: { brandId: base.product.brandId } });
+    if (matches.length === 0) return [];
+
+    const rows = await prisma.storeProduct.findMany({
+      where: { ...visibleWhere(storeId, hideOutOfStock), id: { not: productId }, OR: matches },
+      select: PRODUCT_SELECT,
+      orderBy: [{ createdAt: 'desc' }, { id: 'asc' }],
+      take: limit,
+    });
+    const now = new Date();
+    return rows.map((row) => mapProduct(row, now));
+  },
+
+  // Marcas dos produtos visíveis que têm logo (sem logo não há o que mostrar no carrossel). As que
+  // têm mais produtos na loja vêm primeiro.
+  async listBrands(storeId: string, hideOutOfStock: boolean): Promise<StorefrontBrand[]> {
+    const rows = await prisma.storeProduct.findMany({
+      where: { ...visibleWhere(storeId, hideOutOfStock), product: { isNot: null } },
+      select: { product: { select: { brand: { select: { id: true, name: true, logo: true } } } } },
+      take: CATEGORY_SCAN_LIMIT,
+    });
+
+    const groups = new Map<number, { brand: StorefrontBrand; count: number }>();
+    for (const row of rows) {
+      const brand = row.product?.brand;
+      if (!brand || !brand.logo) continue;
+      const group = groups.get(brand.id);
+      if (group) group.count += 1;
+      else
+        groups.set(brand.id, {
+          brand: { id: brand.id, name: brand.name, logo: brand.logo },
+          count: 1,
+        });
+    }
+
+    return [...groups.values()]
+      .sort((a, b) => b.count - a.count || a.brand.name.localeCompare(b.brand.name))
+      .map((group) => group.brand);
+  },
+
   async listCategories(storeId: string, hideOutOfStock: boolean): Promise<StorefrontCategory[]> {
     const rows = await prisma.storeProduct.findMany({
       where: visibleWhere(storeId, hideOutOfStock),
@@ -170,14 +237,42 @@ export const storefrontRepository = {
       }
     };
 
+    // Filhos de cada categoria: as marcas dos produtos que estão nela (menu pai > filho da vitrine).
+    const children = new Map<string, Map<string, StorefrontCategory>>();
+
     for (const row of rows) {
       const catalog = row.product;
       const image = catalog ? (catalog.productImageSm ?? catalog.productImage) : row.image;
       if (row.category) add('category', row.category.id, row.category.name, image);
       if (catalog) add('brand', String(catalog.brand.id), catalog.brand.name, image);
+      if (row.category && catalog) {
+        const siblings = children.get(row.category.id) ?? new Map<string, StorefrontCategory>();
+        const brandId = String(catalog.brand.id);
+        const child = siblings.get(brandId);
+        if (child) {
+          child.count += 1;
+          child.image ??= image;
+        } else {
+          siblings.set(brandId, {
+            type: 'brand',
+            id: brandId,
+            name: catalog.brand.name,
+            count: 1,
+            image,
+          });
+        }
+        children.set(row.category.id, siblings);
+      }
     }
 
-    return [...groups.values()].sort((a, b) => b.count - a.count || a.name.localeCompare(b.name));
+    const byRelevance = (a: StorefrontCategory, b: StorefrontCategory) =>
+      b.count - a.count || a.name.localeCompare(b.name);
+    for (const group of groups.values()) {
+      const kids = group.type === 'category' ? children.get(group.id) : undefined;
+      if (kids && kids.size > 0) group.children = [...kids.values()].sort(byRelevance);
+    }
+
+    return [...groups.values()].sort(byRelevance);
   },
 
   // Mais vendidos (últimos 90 dias, pedido não cancelado). Só devolve o que ainda está visível.

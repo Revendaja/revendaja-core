@@ -37,6 +37,8 @@ export type MoreStackParamList = {
   StoreHome: undefined;
   EditStore: undefined;
   OnlineSales: undefined;
+  // Cupons de desconto da loja (criar, ligar/desligar e apagar).
+  Coupons: undefined;
   // Detalhe de uma venda real (o mesmo de Finanças), aberto a partir de Vendas Recentes.
   SaleDetail: { saleId: string };
   ClientDetail: { clientId: string };

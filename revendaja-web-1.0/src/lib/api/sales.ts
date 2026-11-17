@@ -13,6 +13,7 @@ import type {
   TimelineGroupBy,
   TopBrand,
   TopProduct,
+  UpdateSaleInput,
 } from './types';
 
 const DAY_MS = 24 * 60 * 60 * 1000;
@@ -51,6 +52,11 @@ export function getSale(id: string) {
 export function getSalesSummary(range: { from: string; to: string; source?: SaleSource }) {
   const query = buildQuery({ from: range.from, to: range.to, source: range.source });
   return request<SalesSummary>(`/sales/summary${query}`, { auth: true });
+}
+
+// Edita cliente, forma de pagamento/parcelas e data. Venda cancelada não edita (409).
+export function updateSale(id: string, input: UpdateSaleInput) {
+  return request<SaleDetail>(`/sales/${id}`, { method: 'PUT', body: input, auth: true });
 }
 
 // Só vendas PENDENTES podem mudar de status. "paid" = a loja recebeu; "cancelled" = devolve o estoque reservado.

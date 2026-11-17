@@ -47,6 +47,8 @@ function buildSale(overrides: Partial<Sale> = {}): Sale {
     fulfillment: 'pickup',
     deliveryAddress: null,
     cashChangeFor: null,
+    discount: 0,
+    couponCode: null,
     items: [
       {
         storeProductId: PRODUCT_A,
@@ -84,6 +86,9 @@ function build() {
     countVisitsSince: jest.fn().mockResolvedValue(0),
     listProducts: jest.fn().mockResolvedValue({ items: [], total: 0 }),
     listCategories: jest.fn().mockResolvedValue([]),
+    listBrands: jest.fn().mockResolvedValue([]),
+    getProduct: jest.fn().mockResolvedValue(null),
+    listRelated: jest.fn().mockResolvedValue([]),
     listBestSellers: jest.fn().mockResolvedValue([]),
     listOffers: jest.fn().mockResolvedValue({ products: [], endsAt: null }),
     listNewest: jest.fn().mockResolvedValue([]),
@@ -103,6 +108,50 @@ async function errorOf(promise: Promise<unknown>): Promise<AppError> {
 }
 
 describe('StorefrontService', () => {
+  describe('página de detalhes do produto', () => {
+    const product = { id: PRODUCT_A, name: 'Malbec', brand: 'O Boticário' };
+
+    it('devolve o produto e os relacionados, respeitando "esconder esgotados" da loja', async () => {
+      const { storefront, service } = build();
+      storefront.getProduct.mockResolvedValue(product);
+      storefront.listRelated.mockResolvedValue([{ id: 'r1' }]);
+
+      const detail = await service.getProductDetail('lealperfumaria', PRODUCT_A);
+
+      expect(detail).toEqual({ product, related: [{ id: 'r1' }] });
+      expect(storefront.getProduct).toHaveBeenCalledWith(
+        'store-1',
+        PRODUCT_A,
+        SETTINGS.hideOutOfStock,
+      );
+      expect(storefront.listRelated).toHaveBeenCalledWith(
+        'store-1',
+        PRODUCT_A,
+        SETTINGS.hideOutOfStock,
+        8,
+      );
+    });
+
+    it('produto que não existe ou está oculto dá 404 PRODUCT_NOT_FOUND (sem buscar relacionados)', async () => {
+      const { storefront, service } = build();
+
+      const error = await errorOf(service.getProductDetail('lealperfumaria', PRODUCT_A));
+
+      expect(error.statusCode).toBe(404);
+      expect(error.code).toBe('PRODUCT_NOT_FOUND');
+      expect(storefront.listRelated).not.toHaveBeenCalled();
+    });
+
+    it('loja que não existe dá 404 STORE_NOT_FOUND', async () => {
+      const { stores, service } = build();
+      stores.findByHandle.mockResolvedValue(null);
+
+      const error = await errorOf(service.getProductDetail('nada', PRODUCT_A));
+
+      expect(error.code).toBe('STORE_NOT_FOUND');
+    });
+  });
+
   describe('loja inexistente ou desativada (vale para vitrine, visita e pedido)', () => {
     const calls: [string, (service: StorefrontService) => Promise<unknown>][] = [
       ['getStorefront', (s) => s.getStorefront('lealperfumaria', { page: 1, pageSize: 20 })],
@@ -221,6 +270,8 @@ describe('StorefrontService', () => {
         fulfillment: 'pickup',
         deliveryAddress: null,
         cashChangeFor: null,
+        discount: 0,
+        couponCode: null,
         createdAt: new Date('2026-09-24T14:59:00.000Z'),
         // 48 h depois de criado (prazo padrão): daí em diante o pedido é cancelado sozinho.
         expiresAt: new Date('2026-09-26T14:59:00.000Z'),

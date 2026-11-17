@@ -42,6 +42,7 @@ const GROUPS: NavGroup[] = [
       { label: 'Minha loja', href: '/loja', icon: 'store' },
       { label: 'Editar loja', href: '/loja/editar', icon: 'edit' },
       { label: 'Aparência', href: '/loja/aparencia', icon: 'layout' },
+      { label: 'Cupons', href: '/loja/cupons', icon: 'ticket' },
       { label: 'Vendas online', href: '/loja/vendas-online', icon: 'globe' },
     ],
   },

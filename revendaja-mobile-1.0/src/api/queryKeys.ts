@@ -16,6 +16,7 @@ export const queryKeys = {
 
   storeCategories: () => ['storeCategories'] as const,
   storeSettings: () => ['storeSettings'] as const,
+  coupons: () => ['coupons'] as const,
   storeStats: () => ['storeStats'] as const,
 
   sales: {

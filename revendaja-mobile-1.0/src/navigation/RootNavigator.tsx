@@ -33,6 +33,7 @@ import ClientDetailScreen from '../screens/app/ClientDetailScreen';
 import StoreScreen from '../screens/app/StoreScreen';
 import EditStoreScreen from '../screens/app/EditStoreScreen';
 import OnlineSalesScreen from '../screens/app/OnlineSalesScreen';
+import CouponsScreen from '../screens/app/CouponsScreen';
 import MoreScreen from '../screens/app/MoreScreen';
 import AccountScreen from '../screens/app/AccountScreen';
 import DeleteAccountScreen from '../screens/app/DeleteAccountScreen';
@@ -107,6 +108,7 @@ function MoreStack() {
       <MoreStackNav.Screen name="StoreHome" component={StoreScreen} />
       <MoreStackNav.Screen name="EditStore" component={EditStoreScreen} />
       <MoreStackNav.Screen name="OnlineSales" component={OnlineSalesScreen} />
+      <MoreStackNav.Screen name="Coupons" component={CouponsScreen} />
       <MoreStackNav.Screen name="SaleDetail" component={SaleDetailScreen} />
       <MoreStackNav.Screen name="ClientDetail" component={ClientDetailScreen} />
     </MoreStackNav.Navigator>

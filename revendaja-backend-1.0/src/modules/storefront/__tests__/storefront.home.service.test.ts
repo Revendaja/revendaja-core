@@ -63,6 +63,9 @@ function build() {
     countVisitsSince: jest.fn(),
     listProducts: jest.fn(),
     listCategories: jest.fn().mockResolvedValue([]),
+    listBrands: jest.fn().mockResolvedValue([]),
+    getProduct: jest.fn().mockResolvedValue(null),
+    listRelated: jest.fn().mockResolvedValue([]),
     listBestSellers: jest.fn().mockResolvedValue([]),
     listOffers: jest.fn().mockResolvedValue({ products: [], endsAt: null }),
     listNewest: jest.fn().mockResolvedValue([]),
@@ -80,6 +83,17 @@ async function errorOf(promise: Promise<unknown>): Promise<AppError> {
 }
 
 describe('StorefrontService#getHome', () => {
+  it('devolve as marcas da loja (com logo) para o carrossel, respeitando o estoque escondido', async () => {
+    const { storefront, service } = build();
+    const brands = [{ id: 1, name: 'Natura', logo: 'https://cdn/natura.png' }];
+    storefront.listBrands.mockResolvedValue(brands);
+
+    const home = await service.getHome('lealperfumaria');
+
+    expect(home.brands).toEqual(brands);
+    expect(storefront.listBrands).toHaveBeenCalledWith('store-1', expect.any(Boolean));
+  });
+
   it('uma loja sem personalização recebe os banners e textos padrão', async () => {
     const { service } = build();
 

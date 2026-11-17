@@ -9,7 +9,12 @@ import { storeRepository, type StoreRepository } from '../store/store.repository
 import { STORE_PLAN_LIMITS, STORE_PLAN_NAMES, type StorePlanLimits } from '../store/store.plans';
 import type { Store } from '../store/store.types';
 import { salesRepository, type SalesRepository } from './sales.repository';
-import type { CreateSaleInput, ListSalesQuery, SalesTimelineQuery } from './sales.schema';
+import type {
+  CreateSaleInput,
+  ListSalesQuery,
+  SalesTimelineQuery,
+  UpdateSaleInput,
+} from './sales.schema';
 import { buildSalesSummary } from './sales.summary';
 import { buildSalesTimeline } from './sales.timeline';
 import type {
@@ -23,6 +28,7 @@ import type {
   StaleProduct,
   TopBrand,
   TopProduct,
+  UpdateSaleData,
 } from './sales.types';
 
 type StoreLookup = Pick<StoreRepository, 'findByUserId'>;
@@ -88,6 +94,7 @@ export class SalesService {
         // Sem fiado: toda venda registrada pela loja já entra como paga.
         status: 'paid',
         source: 'manual',
+        ...(input.soldAt ? { soldAt: input.soldAt } : {}),
         onlyActiveProducts: false,
         items: input.items,
       },
@@ -124,6 +131,7 @@ export class SalesService {
         installments: input.paymentMethod === 'card' ? (input.installments ?? 1) : null,
         status: 'pending',
         source: 'online',
+        couponCode: input.couponCode ?? null,
         onlyActiveProducts: true,
         items: input.items,
       },
@@ -140,6 +148,42 @@ export class SalesService {
   async get(userId: string, saleId: string): Promise<Sale> {
     const store = await this.getOwnStoreOrThrow(userId);
     return this.getSaleOrThrow(store.id, saleId);
+  }
+
+  // Edita cliente, forma de pagamento/parcelas e data. Não mexe em itens, total nem estoque. Venda
+  // cancelada não é editável (409).
+  async update(userId: string, saleId: string, input: UpdateSaleInput): Promise<Sale> {
+    const store = await this.getOwnStoreOrThrow(userId);
+    const sale = await this.getSaleOrThrow(store.id, saleId);
+    if (sale.status === 'cancelled') {
+      throw new ConflictError('Uma venda cancelada não pode ser editada.');
+    }
+
+    const method = input.paymentMethod ?? sale.paymentMethod;
+    if (input.installments != null && method !== 'card') {
+      throw new AppError(
+        'Parcelas só se aplicam ao pagamento no cartão.',
+        400,
+        'INSTALLMENTS_NOT_CARD',
+      );
+    }
+
+    const data: UpdateSaleData = {};
+    if (input.customerName !== undefined) data.customerName = input.customerName;
+    if (input.soldAt !== undefined) data.soldAt = input.soldAt;
+    if (input.paymentMethod !== undefined || input.installments !== undefined) {
+      data.paymentMethod = method as UpdateSaleData['paymentMethod'];
+      // Só o cartão tem parcelas: sai do cartão = null; entra no cartão sem informar = 1x; segue no
+      // cartão sem informar = mantém as atuais.
+      data.installments =
+        method === 'card'
+          ? (input.installments ?? (sale.paymentMethod === 'card' ? sale.installments : 1))
+          : null;
+    }
+
+    const updated = await this.repository.updateDetails(store.id, saleId, data);
+    if (!updated) throw new NotFoundError('Venda não encontrada.');
+    return updated;
   }
 
   // Idempotente: marcar como paga uma venda já paga devolve a venda, sem erro. Venda cancelada
@@ -266,6 +310,8 @@ export class SalesService {
         throw new ConflictError(
           `Estoque insuficiente para "${result.productName}": disponível ${result.available}.`,
         );
+      case 'coupon_invalid':
+        throw new AppError(result.message, 400, 'COUPON_INVALID');
       case 'total_too_large':
         throw new AppError('O total da venda é grande demais.', 400, 'SALE_TOTAL_TOO_LARGE');
       case 'change_too_low':

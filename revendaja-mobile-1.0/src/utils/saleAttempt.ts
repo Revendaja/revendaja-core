@@ -33,10 +33,11 @@ export function saleContentKey(input: {
   customerName: string;
   paymentMethod: string;
   installments?: number;
+  soldAt?: string;
   items: { storeProductId: string; quantity: number }[];
 }): string {
   const items = [...input.items]
     .sort((a, b) => (a.storeProductId < b.storeProductId ? -1 : 1))
     .map((item) => `${item.storeProductId}:${item.quantity}`);
-  return JSON.stringify([input.customerName, input.paymentMethod, input.installments ?? null, items]);
+  return JSON.stringify([input.customerName, input.paymentMethod, input.installments ?? null, input.soldAt ?? null, items]);
 }

@@ -76,9 +76,9 @@ export function CepPicker({
         onClick={toggle}
         aria-expanded={open}
         aria-label={cep ? `CEP ${maskCep(cep.cep)}, alterar` : 'Informar CEP'}
-        className="flex h-10 items-center gap-2 rounded-full px-2 text-left text-ink-700 transition hover:bg-ink-50 hover:text-primary-600 md:px-3"
+        className="flex h-11 w-11 items-center justify-center gap-2 rounded-full text-left text-primary-700 transition hover:bg-primary-50 hover:text-primary-600 md:h-10 md:w-10 lg:w-auto lg:px-3"
       >
-        <PinIcon size={18} className="shrink-0" />
+        <PinIcon size={22} className="shrink-0" />
         <span className="hidden min-w-0 leading-tight lg:block">
           <span className="block text-[11px] text-ink-400">{cep ? 'Entregar em' : 'Receber em casa?'}</span>
           <span className="block max-w-36 truncate text-[13px] font-semibold">

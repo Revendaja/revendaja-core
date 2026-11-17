@@ -8,6 +8,8 @@ import {
   storefrontCustomizationResponseSchema,
   storefrontHomeResponseSchema,
   storefrontParamsSchema,
+  storefrontProductDetailResponseSchema,
+  storefrontProductParamsSchema,
   storefrontQuerySchema,
   storefrontResponseSchema,
   storeStatsResponseSchema,
@@ -18,6 +20,7 @@ import {
   getStorefront,
   getStorefrontCustomization,
   getStorefrontHome,
+  getStorefrontProduct,
   getStoreStats,
   recordVisit,
   updateStorefrontCustomization,
@@ -53,6 +56,21 @@ export async function storefrontRoutes(app: FastifyInstance): Promise<void> {
       },
     },
     getStorefront,
+  );
+
+  server.get(
+    '/public/stores/:handle/products/:productId',
+    {
+      config: { rateLimit: RATE_LIMITS.browse },
+      schema: {
+        tags: ['storefront'],
+        summary:
+          'Página de detalhes de um produto da vitrine (com preço) e outros produtos da mesma categoria ou marca.',
+        params: storefrontProductParamsSchema,
+        response: { 200: storefrontProductDetailResponseSchema },
+      },
+    },
+    getStorefrontProduct,
   );
 
   server.get(

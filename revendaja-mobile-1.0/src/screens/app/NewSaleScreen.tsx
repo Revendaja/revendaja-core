@@ -19,7 +19,7 @@ import { useStoreAccessGuard } from '../../products/useStoreAccessGuard';
 import { useStoreProducts } from '../../products/StoreProductsContext';
 import { formatCurrency } from '../../utils/format';
 import { createSaleAttemptTracker, isDefinitiveRejection, saleContentKey } from '../../utils/saleAttempt';
-import { PAYMENT_CHIPS, PAYMENT_ICON, roundMoney } from '../../utils/sales';
+import { maskDate, parseSaleDate, PAYMENT_CHIPS, PAYMENT_ICON, roundMoney } from '../../utils/sales';
 import { newRequestId } from '../../utils/uuid';
 import type { RootTabParamList } from '../../navigation/types';
 
@@ -47,6 +47,8 @@ export default function NewSaleScreen({ navigation }: Props) {
   const [paymentMethod, setPaymentMethod] = useState<NewSalePaymentMethod>('pix');
   const [cart, setCart] = useState<CartLine[]>([]);
   const [nameError, setNameError] = useState<string | null>(null);
+  const [saleDate, setSaleDate] = useState('');
+  const [dateError, setDateError] = useState<string | null>(null);
   const [formError, setFormError] = useState<string | null>(null);
 
   // Busca de produto (nome ou código de barras): a mesma pesquisa do servidor, com debounce na digitação.
@@ -180,6 +182,8 @@ export default function NewSaleScreen({ navigation }: Props) {
     setProductQuery('');
     commitQuery('');
     setNameError(null);
+    setSaleDate('');
+    setDateError(null);
     setFormError(null);
   }
 
@@ -191,6 +195,12 @@ export default function NewSaleScreen({ navigation }: Props) {
       return;
     }
     setNameError(null);
+    const parsedDate = parseSaleDate(saleDate);
+    if (parsedDate.error) {
+      setDateError(parsedDate.error);
+      return;
+    }
+    setDateError(null);
     if (cart.length === 0) {
       setFormError('Adicione ao menos um produto à venda.');
       return;
@@ -205,6 +215,7 @@ export default function NewSaleScreen({ navigation }: Props) {
     const content: Omit<CreateSaleInput, 'clientRequestId'> = {
       customerName: name,
       paymentMethod,
+      ...(parsedDate.iso ? { soldAt: parsedDate.iso } : {}),
       items: cart.map((line) => ({ storeProductId: line.item.id, quantity: line.quantity })),
     };
     const sold = content.items;
@@ -296,6 +307,27 @@ export default function NewSaleScreen({ navigation }: Props) {
             })}
           </View>
 
+          <Text className="text-xs font-bold text-ink-500 mb-1.5 mt-4">Data da venda (opcional)</Text>
+          <TextInput
+            value={saleDate}
+            onChangeText={(text) => {
+              setSaleDate(maskDate(text));
+              if (dateError) setDateError(null);
+            }}
+            placeholder="Hoje — ou DD/MM/AAAA"
+            placeholderTextColor="#8B8FA3"
+            keyboardType="number-pad"
+            maxLength={10}
+            editable={!loading}
+            accessibilityLabel="Data da venda"
+            className="bg-white rounded-xl px-4 h-12 text-sm text-ink-900"
+            style={{ borderWidth: 1.5, borderColor: dateError ? '#E0453F' : 'transparent' }}
+          />
+          {!!dateError && (
+            <Text className="text-xs text-danger mt-1.5" accessibilityLiveRegion="polite">
+              {dateError}
+            </Text>
+          )}
 
           <Text className="text-xs font-bold text-ink-500 mb-1.5 mt-4">Adicionar produto</Text>
           <View className="flex-row items-center gap-2 mb-1">

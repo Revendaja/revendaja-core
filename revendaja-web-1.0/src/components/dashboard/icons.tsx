@@ -3,7 +3,7 @@ export type IconName =
   | 'store' | 'edit' | 'globe' | 'user' | 'card' | 'star' | 'logout' | 'dots' | 'userPlus'
   | 'smile' | 'layout' | 'chevronDown' | 'chevrons' | 'car' | 'plane' | 'chartLine' | 'lock'
   | 'search' | 'flag' | 'trash' | 'check' | 'download' | 'sparkle' | 'command' | 'menu' | 'perfume' | 'eye' | 'copy' | 'externalLink'
-  | 'pix' | 'cash' | 'barcode' | 'basket' | 'minus' | 'close';
+  | 'pix' | 'cash' | 'barcode' | 'basket' | 'minus' | 'close' | 'clock' | 'ticket';
 
 const PATHS: Record<IconName, React.ReactNode> = {
   grid: (<><rect x="3" y="3" width="8" height="8" rx="1.5" /><rect x="13" y="3" width="8" height="8" rx="1.5" /><rect x="3" y="13" width="8" height="8" rx="1.5" /><rect x="13" y="13" width="8" height="8" rx="1.5" /></>),
@@ -38,6 +38,8 @@ const PATHS: Record<IconName, React.ReactNode> = {
   menu: <path d="M4 9h10M4 15h16" />,
   perfume: (<><rect x="9" y="2" width="6" height="3.5" rx="1" /><path d="M10.5 5.5V8M13.5 5.5V8" /><rect x="5.5" y="8" width="13" height="14" rx="3" /><path d="M10 14h4" /></>),
   eye: (<><path d="M2 12s3.6-7 10-7 10 7 10 7-3.6 7-10 7S2 12 2 12z" /><circle cx="12" cy="12" r="3" /></>),
+  ticket: (<><path d="M3 8a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2v2a2 2 0 0 0 0 4v2a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-2a2 2 0 0 0 0-4z" /><path d="M13 6v2M13 11v2M13 16v2" /></>),
+  clock: (<><circle cx="12" cy="12" r="9" /><path d="M12 7v5l3 2" /></>),
   search: (<><circle cx="11" cy="11" r="7" /><path d="m20 20-3.5-3.5" /></>),
   flag: <path d="M5 21V4M5 4h11l-2.5 4L16 12H5" />,
   trash: (<><path d="M3 6h18M8 6V4h8v2" /><path d="m6 6 1 14h10l1-14M10 11v5M14 11v5" /></>),

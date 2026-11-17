@@ -140,3 +140,32 @@ export function groupSalesByDay(sales: SaleListItem[]): SaleDaySection[] {
 export function roundMoney(value: number): number {
   return Math.round(value * 100) / 100;
 }
+
+// Máscara DD/MM/AAAA enquanto digita.
+export function maskDate(text: string): string {
+  const d = text.replace(/\D/g, '').slice(0, 8);
+  if (d.length <= 2) return d;
+  if (d.length <= 4) return `${d.slice(0, 2)}/${d.slice(2)}`;
+  return `${d.slice(0, 2)}/${d.slice(2, 4)}/${d.slice(4)}`;
+}
+
+// Vazio = hoje (devolve undefined e o servidor usa agora). Data informada vira ISO com a hora atual.
+export function parseSaleDate(text: string): { iso?: string; error?: string } {
+  if (!text.trim()) return {};
+  const m = /^(\d{2})\/(\d{2})\/(\d{4})$/.exec(text.trim());
+  const invalid = { error: 'Data inválida. Use DD/MM/AAAA.' };
+  if (!m) return invalid;
+  const [day, month, year] = [Number(m[1]), Number(m[2]), Number(m[3])];
+  const now = new Date();
+  const date = new Date(year, month - 1, day, now.getHours(), now.getMinutes(), now.getSeconds());
+  if (date.getFullYear() !== year || date.getMonth() !== month - 1 || date.getDate() !== day) return invalid;
+  if (date.getTime() > now.getTime()) return { error: 'A data da venda não pode ser no futuro.' };
+  return { iso: date.toISOString() };
+}
+
+// ISO -> "DD/MM/AAAA" (fuso local), para preencher o campo de data ao editar.
+export function isoToInputDate(iso: string): string {
+  const d = new Date(iso);
+  const pad = (n: number) => String(n).padStart(2, '0');
+  return `${pad(d.getDate())}/${pad(d.getMonth() + 1)}/${d.getFullYear()}`;
+}

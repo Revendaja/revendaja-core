@@ -25,6 +25,7 @@ import { otpRoutes } from './modules/otp/otp.routes';
 import { passwordResetRoutes } from './modules/passwordReset/passwordReset.routes';
 import { storeRoutes } from './modules/store/store.routes';
 import { catalogRoutes } from './modules/catalog/catalog.routes';
+import { couponsRoutes } from './modules/coupons/coupons.routes';
 import { salesRoutes } from './modules/sales/sales.routes';
 import { homeRoutes } from './modules/home/home.routes';
 import { storefrontRoutes } from './modules/storefront/storefront.routes';
@@ -123,6 +124,7 @@ export async function buildApp() {
   await app.register(storeRoutes);
   await app.register(catalogRoutes);
   await app.register(salesRoutes);
+  await app.register(couponsRoutes);
   await app.register(homeRoutes);
   await app.register(storefrontRoutes);
   await app.register(uploadsRoutes);

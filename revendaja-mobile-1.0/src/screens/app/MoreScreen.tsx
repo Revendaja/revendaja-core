@@ -231,6 +231,21 @@ export default function MoreScreen({ navigation }: Props) {
             </View>
             <Ionicons name="chevron-forward" size={18} color="#8A8D9F" />
           </Pressable>
+
+          <View style={{ borderTopWidth: 1, borderTopColor: '#F5F6FA' }} />
+
+          <Pressable className="flex-row items-center px-4 py-3.5" onPress={() => navigation.navigate('Coupons')}>
+            <View className="w-9 h-9 rounded-xl bg-primary-50 items-center justify-center mr-3">
+              <Ionicons name="ticket-outline" size={17} color="#FF6B00" />
+            </View>
+            <View className="flex-1 pr-2">
+              <Text className="text-sm font-bold text-ink-900">Cupons de Desconto</Text>
+              <Text className="text-xs text-ink-400 mt-0.5" numberOfLines={1}>
+                Códigos para os clientes usarem no carrinho
+              </Text>
+            </View>
+            <Ionicons name="chevron-forward" size={18} color="#8A8D9F" />
+          </Pressable>
         </View>
 
         <Text className="text-xs font-extrabold text-ink-400 uppercase mb-2 mt-1">Ações da Loja</Text>

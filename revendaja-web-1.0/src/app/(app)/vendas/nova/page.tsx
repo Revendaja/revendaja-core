@@ -31,12 +31,20 @@ const MAX_CART_ITEMS = 50;
 const SEARCH_DEBOUNCE_MS = 350;
 const RESULTS_LIMIT = 6;
 
+// Hoje (fuso local) no formato do <input type="date">: AAAA-MM-DD.
+function todayInputValue(): string {
+  const now = new Date();
+  const pad = (n: number) => String(n).padStart(2, '0');
+  return `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())}`;
+}
+
 export default function NewSalePage() {
   const router = useRouter();
   const queryClient = useQueryClient();
   const { loading, run } = useSubmitting();
 
   const [customerName, setCustomerName] = useState('');
+  const [saleDate, setSaleDate] = useState('');
   const [paymentMethod, setPaymentMethod] = useState<NewSalePaymentMethod>('pix');
   const [cart, setCart] = useState<CartLine[]>([]);
   const [nameError, setNameError] = useState<string | null>(null);
@@ -156,6 +164,7 @@ export default function NewSalePage() {
     setCart([]);
     setProductQuery('');
     setNameError(null);
+    setSaleDate('');
     setFormError(null);
   }
 
@@ -168,6 +177,18 @@ export default function NewSalePage() {
       return;
     }
     setNameError(null);
+    // Data vazia = hoje (o servidor usa agora). Data escolhida vira ISO com a hora atual.
+    let soldAt: string | undefined;
+    if (saleDate) {
+      const [y, m, d] = saleDate.split('-').map(Number);
+      const now = new Date();
+      const date = new Date(y, m - 1, d, now.getHours(), now.getMinutes(), now.getSeconds());
+      if (Number.isNaN(date.getTime()) || date.getTime() > now.getTime()) {
+        setFormError('A data da venda não pode ser no futuro.');
+        return;
+      }
+      soldAt = date.toISOString();
+    }
     if (cart.length === 0) {
       setFormError('Adicione ao menos um produto à venda.');
       return;
@@ -182,6 +203,7 @@ export default function NewSalePage() {
     const content: Omit<CreateSaleInput, 'clientRequestId'> = {
       customerName: name,
       paymentMethod,
+      ...(soldAt ? { soldAt } : {}),
       items: cart.map((line) => ({ storeProductId: line.item.id, quantity: line.quantity })),
     };
 
@@ -232,6 +254,21 @@ export default function NewSalePage() {
                 aria-label="Nome do cliente"
               />
             </Field>
+
+            <div className="mt-4">
+              <label htmlFor="sale-date" className="mb-1.5 block text-xs font-semibold text-ink-600">
+                Data da venda (opcional — vazio = hoje)
+              </label>
+              <input
+                id="sale-date"
+                type="date"
+                value={saleDate}
+                max={todayInputValue()}
+                onChange={(event) => setSaleDate(event.target.value)}
+                disabled={loading}
+                className="h-11 w-full rounded-xl border border-ink-100 bg-white px-3 text-sm text-ink-900 disabled:opacity-60"
+              />
+            </div>
 
             <p className="mb-1.5 mt-4 text-xs font-semibold text-ink-600">Forma de pagamento</p>
             <div className="flex flex-wrap gap-2">

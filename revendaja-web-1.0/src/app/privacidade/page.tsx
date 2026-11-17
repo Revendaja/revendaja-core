@@ -9,7 +9,7 @@ export const metadata: Metadata = {
     'Como o RevendaJá coleta, usa, compartilha e protege os dados de quem usa o aplicativo e a vitrine online.',
 };
 
-const LAST_UPDATE = '8 de novembro de 2026';
+const LAST_UPDATE = '14 de novembro de 2026';
 
 export default function PrivacyPolicyPage() {
   return (
@@ -105,6 +105,59 @@ export default function PrivacyPolicyPage() {
           Stripe e não passam pelos nossos servidores nem ficam guardados por nós. Recebemos da
           Stripe apenas informações como o status e o período da assinatura.
         </p>
+
+        <h3 className="font-semibold text-ink-900">2.8 Cookies e armazenamento no seu aparelho</h3>
+        <p>
+          Para a vitrine e o painel funcionarem sem exigir que o cliente crie conta, guardamos
+          algumas informações no próprio navegador do aparelho, por meio do armazenamento local
+          (localStorage e sessionStorage), que cumpre o papel dos cookies nesses casos. Essas
+          informações ficam no seu aparelho e <strong>só chegam até nós</strong> quando você as
+          envia de propósito, por exemplo ao finalizar um pedido. Na vitrine de uma loja, guardamos:
+        </p>
+        <List
+          items={[
+            <>
+              <strong>Carrinho:</strong> os produtos e as quantidades que você adicionou, para o
+              carrinho não se perder ao recarregar a página.
+            </>,
+            <>
+              <strong>Favoritos:</strong> os produtos que você marcou com o coração.
+            </>,
+            <>
+              <strong>Dados do último pedido:</strong> nome, WhatsApp, forma de recebimento,
+              endereço e forma de pagamento (o troco não é guardado), para preencher o pedido
+              seguinte. Só são salvos depois que você faz um pedido.
+            </>,
+            <>
+              <strong>CEP:</strong> o CEP que você informou e o endereço correspondente.
+            </>,
+            <>
+              <strong>Buscas recentes:</strong> as últimas 5 palavras que você pesquisou na loja, para
+              sugerir de novo quando você tocar na busca.
+            </>,
+            <>
+              <strong>Marca de visita:</strong> um registro temporário (sessionStorage, que some ao
+              fechar a aba) para contarmos uma visita por sessão, sem identificar você.
+            </>,
+            <>
+              <strong>Aviso de privacidade:</strong> a informação de que você já viu o aviso da
+              vitrine.
+            </>,
+          ]}
+        />
+        <p>
+          No painel e no aplicativo da loja (área logada), guardamos também o código que mantém
+          você conectada(o) depois de recarregar a página e a sua preferência sobre alertas do
+          navegador.
+        </p>
+        <p>
+          <strong>Não usamos cookies de publicidade</strong> nem ferramentas de terceiros para
+          rastrear você em outros sites, e não vendemos esses dados. Você apaga tudo isso quando
+          quiser: na busca, o botão <em>Limpar histórico</em> apaga as buscas recentes; no carrinho,
+          o botão <em>Limpar</em> remove os dados do último pedido; e também é possível limpar os
+          dados do site nas configurações do navegador. Sem essas informações a vitrine continua
+          funcionando, só não lembra de você na próxima visita.
+        </p>
       </Section>
 
       <Section title="3. Permissões do aplicativo">
@@ -170,6 +223,11 @@ export default function PrivacyPolicyPage() {
               Android.
             </>,
             <>
+              <strong>ViaCEP:</strong> serviço público que consulta o endereço de um CEP. Quando
+              você informa o CEP na vitrine, o número é enviado ao ViaCEP para trazer a rua, o
+              bairro e a cidade.
+            </>,
+            <>
               <strong>Expo:</strong> envio de notificações push.
             </>,
             <>
@@ -204,6 +262,7 @@ export default function PrivacyPolicyPage() {
           items={[
             'Os dados da conta e da loja ficam guardados enquanto a conta estiver ativa.',
             'Os registros de visitas à vitrine são apagados automaticamente após cerca de 30 dias.',
+            'As informações guardadas no seu aparelho (seção 2.8) ficam lá até você apagá-las; não temos acesso a elas.',
             'Códigos de verificação e recuperação de senha expiram em minutos e são invalidados após o uso.',
             'Após a exclusão da conta, apagamos ou anonimizamos os dados, exceto o que precisarmos manter para cumprir obrigações legais ou exercer direitos em processos.',
           ]}

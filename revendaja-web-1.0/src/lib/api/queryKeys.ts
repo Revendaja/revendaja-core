@@ -17,6 +17,7 @@ export const queryKeys = {
   storefrontCustomization: () => ['store', 'storefront'] as const,
   storeStats: () => ['store', 'stats'] as const,
   storeSettings: () => ['store', 'settings'] as const,
+  coupons: () => ['store', 'coupons'] as const,
   unreadNotifications: () => ['notifications', 'unread-count'] as const,
   notifications: () => ['notifications', 'list'] as const,
   allNotifications: () => ['notifications'] as const,

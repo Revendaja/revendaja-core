@@ -87,6 +87,10 @@ export function homeData(overrides: Partial<StorefrontHome> = {}): StorefrontHom
       { type: 'brand', id: '1', name: 'Natura', count: 12, image: 'https://img.test/natura.jpg' },
       { type: 'category', id: 'cat-1', name: 'Presentes', count: 4, image: null },
     ],
+    brands: [
+      { id: 1, name: 'Natura', logo: 'https://img.test/natura-logo.png' },
+      { id: 2, name: 'Avon', logo: 'https://img.test/avon-logo.png' },
+    ],
     featured: many('f', 8),
     offers: {
       products: [onSale('o1', 100, 70), onSale('o2', 50, 45)],

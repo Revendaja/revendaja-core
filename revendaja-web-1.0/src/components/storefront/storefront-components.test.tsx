@@ -3,6 +3,7 @@ import { act, fireEvent, render, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { DEFAULT_CONFIG, homeData, onSale, product } from '@/test/storefrontFixtures';
 import { BenefitsStrip } from './BenefitsStrip';
+import { BrandsStrip } from './BrandsStrip';
 import { CategoryShelf } from './CategoryShelf';
 import { CollectionBanners } from './CollectionBanners';
 import { Countdown, FlashSale } from './FlashSale';
@@ -43,21 +44,17 @@ describe('SafeImage', () => {
 });
 
 describe('ProductCard', () => {
-  it('mostra marca, nome, preço e adiciona ao carrinho', async () => {
-    const onAdd = vi.fn();
-    render(<ProductCard product={product('a', { name: 'Kaiak', brand: 'Natura', price: 55 })} inCart={0} onAdd={onAdd} />);
+  it('mostra marca, nome e preço, sem botão de adicionar (o carrinho é na página do produto)', () => {
+    render(<ProductCard product={product('a', { name: 'Kaiak', brand: 'Natura', price: 55 })} />);
 
     expect(screen.getByText('Natura')).toBeInTheDocument();
     expect(screen.getByRole('heading', { name: 'Kaiak' })).toBeInTheDocument();
     expect(screen.getByText(/55,00/)).toBeInTheDocument();
-
-    await userEvent.click(screen.getByRole('button', { name: 'Adicionar' }));
-
-    expect(onAdd).toHaveBeenCalledTimes(1);
+    expect(screen.queryByRole('button', { name: /Adicionar/ })).not.toBeInTheDocument();
   });
 
   it('promoção: selo de desconto, preço novo e o antigo riscado', () => {
-    render(<ProductCard product={onSale('a', 100, 80)} inCart={0} onAdd={() => {}} />);
+    render(<ProductCard product={onSale('a', 100, 80)} />);
 
     expect(screen.getByText('-20%')).toBeInTheDocument();
     expect(screen.getByText(/80,00/)).toBeInTheDocument();
@@ -65,27 +62,23 @@ describe('ProductCard', () => {
   });
 
   it('produto novo ganha o selo "Novo"; sem ser novo, não', () => {
-    const { rerender } = render(<ProductCard product={product('a', { isNew: true })} inCart={0} onAdd={() => {}} />);
+    const { rerender } = render(<ProductCard product={product('a', { isNew: true })} />);
     expect(screen.getByText('Novo')).toBeInTheDocument();
 
-    rerender(<ProductCard product={product('a', { isNew: false })} inCart={0} onAdd={() => {}} />);
+    rerender(<ProductCard product={product('a', { isNew: false })} />);
     expect(screen.queryByText('Novo')).not.toBeInTheDocument();
   });
 
-  it('esgotado: botão desabilitado', () => {
-    render(<ProductCard product={product('a', { inStock: false })} inCart={0} onAdd={() => {}} />);
+  it('esgotado: mostra o aviso; com estoque, não', () => {
+    const { rerender } = render(<ProductCard product={product('a', { inStock: false })} />);
+    expect(screen.getByText('Esgotado')).toBeInTheDocument();
 
-    expect(screen.getByRole('button', { name: 'Esgotado' })).toBeDisabled();
-  });
-
-  it('já no carrinho: mostra a quantidade no botão', () => {
-    render(<ProductCard product={product('a')} inCart={3} onAdd={() => {}} />);
-
-    expect(screen.getByRole('button', { name: 'Adicionar mais (3)' })).toBeInTheDocument();
+    rerender(<ProductCard product={product('a', { inStock: true })} />);
+    expect(screen.queryByText('Esgotado')).not.toBeInTheDocument();
   });
 
   it('sem foto, mostra um ícone no lugar', () => {
-    const { container } = render(<ProductCard product={product('a', { image: null, imageSm: null })} inCart={0} onAdd={() => {}} />);
+    const { container } = render(<ProductCard product={product('a', { image: null, imageSm: null })} />);
 
     expect(container.querySelector('img')).toBeNull();
     expect(container.querySelector('svg')).not.toBeNull();
@@ -104,8 +97,7 @@ describe('StorefrontHeader', () => {
       announcement: DEFAULT_CONFIG.announcement,
       acceptedPaymentMethods: ['pix'],
       sections: [],
-      query: '',
-      onQueryChange: vi.fn(),
+      onSearch: vi.fn(),
       cartCount: 0,
       onOpenCart: vi.fn(),
     };
@@ -117,8 +109,7 @@ describe('StorefrontHeader', () => {
       announcement: DEFAULT_CONFIG.announcement,
       acceptedPaymentMethods: ['pix', 'card'] as ('pix' | 'card' | 'cash')[],
       sections,
-      query: '',
-      onQueryChange: vi.fn(),
+      onSearch: vi.fn(),
       cartCount: 0,
       onOpenCart: vi.fn(),
       ...overrides,
@@ -154,14 +145,115 @@ describe('StorefrontHeader', () => {
     expect(screen.queryByRole('button', { name: 'Novidades' })).not.toBeInTheDocument();
   });
 
-  it('busca: avisa a cada letra e limpa pelo X', async () => {
-    const props = setup({ query: 'kai' });
+  describe('busca', () => {
+    it('digitar não busca: só o Enter confirma', async () => {
+      const props = setup();
 
-    await userEvent.type(screen.getByLabelText('Buscar produto'), 'a');
-    await userEvent.click(screen.getByRole('button', { name: 'Limpar busca' }));
+      await userEvent.type(screen.getByLabelText('Buscar produto'), 'kaiak');
+      expect(props.onSearch).not.toHaveBeenCalled();
 
-    expect(props.onQueryChange).toHaveBeenCalledWith('kaia');
-    expect(props.onQueryChange).toHaveBeenLastCalledWith('');
+      await userEvent.keyboard('{Enter}');
+      expect(props.onSearch).toHaveBeenCalledTimes(1);
+      expect(props.onSearch).toHaveBeenCalledWith('kaiak');
+    });
+
+    it('a lupa também confirma a busca', async () => {
+      const props = setup();
+
+      await userEvent.type(screen.getByLabelText('Buscar produto'), '  malbec ');
+      await userEvent.click(screen.getByRole('button', { name: 'Pesquisar' }));
+
+      expect(props.onSearch).toHaveBeenCalledWith('malbec');
+    });
+
+    it('menos de 2 letras não busca', async () => {
+      const props = setup();
+
+      await userEvent.type(screen.getByLabelText('Buscar produto'), 'k{Enter}');
+
+      expect(props.onSearch).not.toHaveBeenCalled();
+    });
+
+    it('o X limpa o campo e, estando numa busca, volta para a home', async () => {
+      const onClearSearch = vi.fn();
+      setup({ searchTerm: 'kaiak', onClearSearch });
+      const input = screen.getByLabelText('Buscar produto');
+      expect(input).toHaveValue('kaiak');
+
+      await userEvent.click(screen.getByRole('button', { name: 'Limpar busca' }));
+
+      expect(input).toHaveValue('');
+      expect(onClearSearch).toHaveBeenCalledTimes(1);
+    });
+
+    it('o campo acompanha a busca em vigor quando ela muda por fora', () => {
+      const { rerender } = render(<StorefrontHeader {...baseProps()} searchTerm="kaiak" />);
+      expect(screen.getByLabelText('Buscar produto')).toHaveValue('kaiak');
+
+      rerender(<StorefrontHeader {...baseProps()} searchTerm="" />);
+      expect(screen.getByLabelText('Buscar produto')).toHaveValue('');
+    });
+
+    describe('buscas recentes', () => {
+      const recentSearches = ['kaiak', 'malbec', 'floratta'];
+
+      it('ao focar o campo mostra as buscas recentes; sem histórico, nada', async () => {
+        const { unmount } = render(<StorefrontHeader {...baseProps()} recentSearches={recentSearches} />);
+
+        await userEvent.click(screen.getByLabelText('Buscar produto'));
+
+        const list = screen.getByRole('listbox', { name: 'Buscas recentes' });
+        expect(within(list).getAllByRole('option').map((item) => item.textContent)).toEqual(['kaiak', 'malbec', 'floratta']);
+        unmount();
+
+        render(<StorefrontHeader {...baseProps()} recentSearches={[]} />);
+        await userEvent.click(screen.getByLabelText('Buscar produto'));
+        expect(screen.queryByRole('listbox')).not.toBeInTheDocument();
+      });
+
+      it('clicar numa busca recente roda a busca', async () => {
+        const onSearch = vi.fn();
+        render(<StorefrontHeader {...baseProps()} recentSearches={recentSearches} onSearch={onSearch} />);
+
+        await userEvent.click(screen.getByLabelText('Buscar produto'));
+        await userEvent.click(screen.getByRole('option', { name: 'malbec' }));
+
+        expect(onSearch).toHaveBeenCalledWith('malbec');
+        expect(screen.queryByRole('listbox')).not.toBeInTheDocument();
+      });
+
+      it('digitar filtra a lista de recentes', async () => {
+        render(<StorefrontHeader {...baseProps()} recentSearches={recentSearches} />);
+
+        await userEvent.type(screen.getByLabelText('Buscar produto'), 'mal');
+
+        expect(screen.getAllByRole('option').map((item) => item.textContent)).toEqual(['malbec']);
+      });
+
+      it('remove uma busca recente e limpa o histórico todo', async () => {
+        const onRemoveRecent = vi.fn();
+        const onClearRecent = vi.fn();
+        render(
+          <StorefrontHeader {...baseProps()} recentSearches={recentSearches} onRemoveRecent={onRemoveRecent} onClearRecent={onClearRecent} />,
+        );
+        await userEvent.click(screen.getByLabelText('Buscar produto'));
+
+        await userEvent.click(screen.getByRole('button', { name: 'Remover kaiak do histórico' }));
+        await userEvent.click(screen.getByRole('button', { name: 'Limpar histórico' }));
+
+        expect(onRemoveRecent).toHaveBeenCalledWith('kaiak');
+        expect(onClearRecent).toHaveBeenCalledTimes(1);
+      });
+
+      it('Esc fecha a lista', async () => {
+        render(<StorefrontHeader {...baseProps()} recentSearches={recentSearches} />);
+        await userEvent.click(screen.getByLabelText('Buscar produto'));
+
+        await userEvent.keyboard('{Escape}');
+
+        expect(screen.queryByRole('listbox')).not.toBeInTheDocument();
+      });
+    });
   });
 
   it('sem conta: cumprimenta "Visitante" e, depois do primeiro pedido, o primeiro nome', () => {
@@ -356,6 +448,35 @@ describe('BenefitsStrip', () => {
   });
 });
 
+describe('BrandsStrip', () => {
+  const brand = (id: number, name: string) => ({ id, name, logo: `https://img.test/${id}.png` });
+
+  it('não aparece sem marcas', () => {
+    const { container } = render(<BrandsStrip brands={[]} onSelect={() => {}} />);
+
+    expect(container).toBeEmptyDOMElement();
+  });
+
+  it('poucas marcas ficam paradas e tocar na logo escolhe a marca', async () => {
+    const onSelect = vi.fn();
+    render(<BrandsStrip brands={[brand(1, 'Natura'), brand(2, 'Avon')]} onSelect={onSelect} />);
+
+    await userEvent.click(screen.getByRole('button', { name: 'Ver produtos Natura' }));
+
+    expect(onSelect).toHaveBeenCalledWith(brand(1, 'Natura'));
+    expect(screen.getAllByRole('button')).toHaveLength(2);
+  });
+
+  it('muitas marcas viram letreiro, com cópias escondidas do leitor de tela', () => {
+    const brands = Array.from({ length: 6 }, (_, i) => brand(i + 1, `Marca ${i + 1}`));
+    const { container } = render(<BrandsStrip brands={brands} onSelect={() => {}} />);
+
+    // Só a primeira cópia é acessível; as outras 3 são decoração do loop.
+    expect(screen.getAllByRole('button', { name: /Ver produtos/ })).toHaveLength(6);
+    expect(container.querySelectorAll('ul[aria-hidden="true"]')).toHaveLength(3);
+  });
+});
+
 describe('CategoryShelf', () => {
   const categories = homeData().categories;
 
@@ -518,6 +639,68 @@ describe('StorefrontFooter', () => {
     expect(screen.getByText('Pix')).toBeInTheDocument();
     expect(screen.getByText('Dinheiro')).toBeInTheDocument();
     expect(screen.queryByText('Cartão')).not.toBeInTheDocument();
+  });
+
+  describe('rodapé completo', () => {
+    function setupFooter(overrides: Partial<React.ComponentProps<typeof StorefrontFooter>> = {}) {
+      const props = {
+        storeName: 'Leal Perfumaria',
+        bio: null,
+        acceptedPaymentMethods: ['pix', 'card'] as ('pix' | 'card' | 'cash')[],
+        hideBranding: false,
+        onShopAll: vi.fn(),
+        shopLinks: [
+          { label: 'Início', onClick: vi.fn() },
+          { label: 'Ofertas', onClick: vi.fn() },
+        ],
+        categoryLinks: [{ label: 'Presentes', onClick: vi.fn() }],
+        ...overrides,
+      };
+      render(<StorefrontFooter {...props} />);
+      return props;
+    }
+
+    it('tem as colunas Loja, Categorias, Pagamento e Revendajá, e os atalhos fazem o que dizem', async () => {
+      const props = setupFooter();
+
+      for (const title of ['Loja', 'Categorias', 'Pagamento', 'Revendajá']) {
+        expect(screen.getByRole('heading', { name: title })).toBeInTheDocument();
+      }
+      await userEvent.click(screen.getByRole('button', { name: 'Ofertas' }));
+      await userEvent.click(screen.getByRole('button', { name: 'Presentes' }));
+      await userEvent.click(screen.getByRole('button', { name: /Ver todos os produtos/ }));
+
+      expect(props.shopLinks[1].onClick).toHaveBeenCalledTimes(1);
+      expect(props.categoryLinks[0].onClick).toHaveBeenCalledTimes(1);
+      expect(props.onShopAll).toHaveBeenCalledTimes(1);
+    });
+
+    it('coluna do Revendajá com links para a plataforma; some nos planos que escondem a marca', () => {
+      const { unmount } = render(<StorefrontFooter storeName="Leal" bio={null} acceptedPaymentMethods={['pix']} hideBranding={false} />);
+      expect(screen.getByRole('link', { name: 'Conheça o Revendajá' })).toHaveAttribute('href', 'https://revendaja.com');
+      expect(screen.getByRole('link', { name: 'Crie a sua loja' })).toBeInTheDocument();
+      unmount();
+
+      render(<StorefrontFooter storeName="Leal" bio={null} acceptedPaymentMethods={['pix']} hideBranding />);
+      expect(screen.queryByRole('heading', { name: 'Revendajá' })).not.toBeInTheDocument();
+      expect(screen.queryByRole('link', { name: /Revendajá|Crie a sua loja/ })).not.toBeInTheDocument();
+    });
+
+    it('sem links nem categorias, essas colunas não aparecem', () => {
+      render(<StorefrontFooter storeName="Leal" bio={null} acceptedPaymentMethods={['pix']} hideBranding />);
+
+      expect(screen.queryByRole('heading', { name: 'Loja' })).not.toBeInTheDocument();
+      expect(screen.queryByRole('heading', { name: 'Categorias' })).not.toBeInTheDocument();
+      expect(screen.queryByRole('button', { name: /Ver todos os produtos/ })).not.toBeInTheDocument();
+    });
+
+    it('barra de baixo: privacidade, direitos da loja e a menção ao Revendajá', () => {
+      setupFooter();
+
+      expect(screen.getByRole('link', { name: 'Política de privacidade' })).toBeInTheDocument();
+      expect(screen.getByText(/© \d{4} Leal Perfumaria/)).toBeInTheDocument();
+      expect(screen.getByRole('link', { name: 'Revendajá' })).toBeInTheDocument();
+    });
   });
 
   it('mostra a marca do Revendajá, exceto nos planos que a escondem', () => {

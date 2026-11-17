@@ -22,6 +22,12 @@ export interface StorefrontProduct {
   isNew: boolean;
 }
 
+// Página de detalhes de um produto: ele mesmo + outros da mesma categoria/marca.
+export interface StorefrontProductDetail {
+  product: StorefrontProduct;
+  related: StorefrontProduct[];
+}
+
 export interface Storefront {
   store: {
     storeName: string;
@@ -48,6 +54,9 @@ export interface OnlineOrderReceipt {
   deliveryAddress: string | null;
   // Só entrega paga em dinheiro: troco para quanto. null = não precisa de troco.
   cashChangeFor: number | null;
+  // Desconto de cupom já abatido do `total` (0 = sem cupom) e o código usado.
+  discount: number;
+  couponCode: string | null;
   createdAt: Date;
   // Até quando o pedido espera o pagamento: depois disso é cancelado sozinho e o estoque volta.
   expiresAt: Date;
@@ -63,6 +72,13 @@ export interface StoreStats {
 
 // Atalho de categoria da vitrine: nasce do que a loja vende. `category` = categoria própria da loja;
 // `brand` = marca dos produtos do catálogo.
+// Marca (com logo) dos produtos que a loja vende, para o carrossel da vitrine.
+export interface StorefrontBrand {
+  id: number;
+  name: string;
+  logo: string;
+}
+
 export interface StorefrontCategory {
   type: 'category' | 'brand';
   id: string;
@@ -71,6 +87,8 @@ export interface StorefrontCategory {
   count: number;
   // Foto de um dos produtos dela, para o atalho.
   image: string | null;
+  // Só em `category`: as marcas dos produtos que estão nela (os "filhos" no menu da vitrine).
+  children?: StorefrontCategory[];
 }
 
 // Página inicial da vitrine: o que vem pronto (banners/textos, padrão ou personalizado) e as seções
@@ -88,6 +106,7 @@ export interface StorefrontHome {
   };
   config: StorefrontConfig;
   categories: StorefrontCategory[];
+  brands: StorefrontBrand[];
   // Mais vendidos nos últimos 90 dias; completa com os mais novos se ainda não há vendas.
   featured: StorefrontProduct[];
   // Produtos em promoção que ainda valem; `endsAt` = quando acaba a primeira (contagem regressiva).

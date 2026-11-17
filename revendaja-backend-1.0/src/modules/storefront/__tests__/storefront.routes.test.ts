@@ -17,6 +17,8 @@ const txStoreProductFindMany = jest.fn();
 const txStoreProductUpdateMany = jest.fn();
 const txStoreProductFindUnique = jest.fn();
 const txSaleCreate = jest.fn();
+const txCouponFindUnique = jest.fn();
+const txCouponUpdateMany = jest.fn();
 const queryRaw = jest.fn();
 
 jest.mock('../../../database/prisma', () => ({
@@ -106,6 +108,9 @@ function orderRow(overrides: Record<string, unknown> = {}) {
     installments: null,
     status: 'pending',
     source: 'online',
+    discount: money(0),
+    couponId: null,
+    couponCode: null,
     total: money(110),
     createdAt: new Date('2026-09-24T14:59:00.000Z'),
     items: [
@@ -188,6 +193,8 @@ beforeEach(() => {
     txStoreProductUpdateMany,
     txStoreProductFindUnique,
     txSaleCreate,
+    txCouponFindUnique,
+    txCouponUpdateMany,
     queryRaw,
   ].forEach((mock) => mock.mockReset());
 
@@ -201,6 +208,7 @@ beforeEach(() => {
         findUnique: txStoreProductFindUnique,
       },
       sale: { create: txSaleCreate },
+      coupon: { findUnique: txCouponFindUnique, updateMany: txCouponUpdateMany },
     }),
   );
   arrangeStore();
@@ -539,6 +547,157 @@ describe('POST /public/stores/:handle/orders (pedido do cliente = venda pendente
 
     expect(response.statusCode).toBe(201);
     expect(txSaleCreate.mock.calls[0][0].data.installments).toBe(3);
+  });
+
+  describe('cupom de desconto', () => {
+    const COUPON_ID = '55555555-5555-4555-8555-555555555555';
+    function couponRow(overrides: Record<string, unknown> = {}) {
+      return {
+        id: COUPON_ID,
+        storeId: 'store-1',
+        code: 'VERAO10',
+        type: 'percent',
+        value: money(10),
+        minOrder: null,
+        maxUses: null,
+        usedCount: 0,
+        expiresAt: null,
+        isActive: true,
+        createdAt: new Date('2026-09-01T00:00:00.000Z'),
+        ...overrides,
+      };
+    }
+
+    it('cupom percentual: o desconto sai do total (calculado com o preço do banco) e o uso é consumido', async () => {
+      arrangeOrderSuccess();
+      txCouponFindUnique.mockResolvedValue(couponRow());
+      txCouponUpdateMany.mockResolvedValue({ count: 1 });
+      txSaleCreate.mockResolvedValue(
+        orderRow({
+          total: money(99),
+          discount: money(11),
+          couponId: COUPON_ID,
+          couponCode: 'VERAO10',
+        }),
+      );
+
+      const response = await call('POST', URL, { ...validOrder, couponCode: 'VERAO10' });
+
+      expect(response.statusCode).toBe(201);
+      // 2 x R$ 55,00 = 110; 10% = 11; total 99
+      expect(txSaleCreate.mock.calls[0][0].data).toMatchObject({
+        total: 99,
+        discount: 11,
+        couponId: COUPON_ID,
+        couponCode: 'VERAO10',
+      });
+      expect(txCouponUpdateMany).toHaveBeenCalledWith({
+        where: { id: COUPON_ID, isActive: true },
+        data: { usedCount: { increment: 1 } },
+      });
+      expect(response.json()).toMatchObject({ total: 99, discount: 11, couponCode: 'VERAO10' });
+    });
+
+    it('com limite de usos, o UPDATE só casa enquanto há uso sobrando', async () => {
+      arrangeOrderSuccess();
+      txCouponFindUnique.mockResolvedValue(couponRow({ maxUses: 5, usedCount: 4 }));
+      txCouponUpdateMany.mockResolvedValue({ count: 1 });
+
+      await call('POST', URL, { ...validOrder, couponCode: 'VERAO10' });
+
+      expect(txCouponUpdateMany).toHaveBeenCalledWith({
+        where: { id: COUPON_ID, isActive: true, usedCount: { lt: 5 } },
+        data: { usedCount: { increment: 1 } },
+      });
+    });
+
+    it('o código é normalizado (espaços e minúsculas) antes de buscar', async () => {
+      arrangeOrderSuccess();
+      txCouponFindUnique.mockResolvedValue(couponRow());
+      txCouponUpdateMany.mockResolvedValue({ count: 1 });
+
+      await call('POST', URL, { ...validOrder, couponCode: ' verao10 ' });
+
+      expect(txCouponFindUnique).toHaveBeenCalledWith({
+        where: { storeId_code: { storeId: 'store-1', code: 'VERAO10' } },
+      });
+    });
+
+    it('cupom que não existe: 400 COUPON_INVALID e nada é gravado (a transação desfaz)', async () => {
+      arrangeOrderSuccess();
+      txCouponFindUnique.mockResolvedValue(null);
+
+      const response = await call('POST', URL, { ...validOrder, couponCode: 'NAOEXISTE' });
+
+      expect(response.statusCode).toBe(400);
+      expect(response.json().error).toBe('COUPON_INVALID');
+      expect(txSaleCreate).not.toHaveBeenCalled();
+      expect(txStoreProductUpdateMany).not.toHaveBeenCalled();
+    });
+
+    it('cupom vencido, desligado ou abaixo do mínimo: 400, sem consumir uso', async () => {
+      for (const overrides of [
+        { expiresAt: new Date('2020-01-01T00:00:00.000Z') },
+        { isActive: false },
+        { minOrder: money(500) },
+      ]) {
+        arrangeOrderSuccess();
+        txCouponFindUnique.mockResolvedValue(couponRow(overrides));
+        txCouponUpdateMany.mockClear();
+
+        const response = await call('POST', URL, { ...validOrder, couponCode: 'VERAO10' });
+
+        expect(response.statusCode).toBe(400);
+        expect(response.json().error).toBe('COUPON_INVALID');
+        expect(txCouponUpdateMany).not.toHaveBeenCalled();
+      }
+    });
+
+    it('duas compras ao mesmo tempo no último uso: a que perde a corrida recebe 400', async () => {
+      arrangeOrderSuccess();
+      txCouponFindUnique.mockResolvedValue(couponRow({ maxUses: 1, usedCount: 0 }));
+      txCouponUpdateMany.mockResolvedValue({ count: 0 });
+
+      const response = await call('POST', URL, { ...validOrder, couponCode: 'VERAO10' });
+
+      expect(response.statusCode).toBe(400);
+      expect(response.json().error).toBe('COUPON_INVALID');
+      expect(txSaleCreate).not.toHaveBeenCalled();
+    });
+
+    it('troco é conferido contra o total DEPOIS do desconto', async () => {
+      arrangeOrderSuccess();
+      txCouponFindUnique.mockResolvedValue(couponRow());
+      txCouponUpdateMany.mockResolvedValue({ count: 1 });
+      txSaleCreate.mockResolvedValue(orderRow({ total: money(99) }));
+
+      const ADDRESS = 'Rua das Flores, 100, apto 3, Centro';
+      const response = await call('POST', URL, {
+        ...validOrder,
+        fulfillment: 'delivery',
+        deliveryAddress: ADDRESS,
+        paymentMethod: 'cash',
+        // 105 é menor que 110 (sem cupom), mas maior que 99 (com cupom)
+        cashChangeFor: 105,
+        couponCode: 'VERAO10',
+      });
+
+      expect(response.statusCode).toBe(201);
+    });
+
+    it('sem cupom, o pedido segue como antes: sem desconto e sem tocar em cupom', async () => {
+      arrangeOrderSuccess();
+
+      const response = await call('POST', URL, validOrder);
+
+      expect(response.statusCode).toBe(201);
+      expect(txCouponFindUnique).not.toHaveBeenCalled();
+      expect(txSaleCreate.mock.calls[0][0].data).toMatchObject({
+        discount: 0,
+        couponId: null,
+        couponCode: null,
+      });
+    });
   });
 
   describe('retirada ou entrega, endereço e troco', () => {

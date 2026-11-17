@@ -22,6 +22,7 @@ import type {
   StorefrontCustomization,
   StorefrontHome,
   StoreStats,
+  StorefrontProductDetail,
 } from './storefront.types';
 
 type StoreQueries = Pick<StoreRepository, 'findByHandle' | 'findByUserId' | 'getSettings'>;
@@ -30,7 +31,10 @@ type StorefrontQueries = Pick<
   | 'recordVisit'
   | 'countVisitsSince'
   | 'listProducts'
+  | 'getProduct'
+  | 'listRelated'
   | 'listCategories'
+  | 'listBrands'
   | 'listBestSellers'
   | 'listOffers'
   | 'listNewest'
@@ -44,6 +48,8 @@ const STATS_WINDOW_DAYS = 7;
 // Quantos produtos cada seção da página inicial mostra.
 const HOME_SECTION_SIZE = 8;
 const HOME_CATEGORIES_MAX = 12;
+// Quantos produtos "quem viu também gostou" mostra na página de detalhes.
+const RELATED_SIZE = 8;
 // Planos que tiram a marca do Revendajá do rodapé da vitrine.
 const WHITE_LABEL_PLANS: readonly string[] = ['premium'];
 const HOUR_MS = 60 * 60 * 1000;
@@ -61,6 +67,8 @@ function toReceipt(sale: Sale, expirationHours: number): OnlineOrderReceipt {
     fulfillment: sale.fulfillment ?? 'pickup',
     deliveryAddress: sale.deliveryAddress,
     cashChangeFor: sale.cashChangeFor,
+    discount: sale.discount,
+    couponCode: sale.couponCode,
     createdAt: sale.createdAt,
     expiresAt: new Date(sale.createdAt.getTime() + expirationHours * HOUR_MS),
     items: sale.items.map((item) => ({
@@ -109,6 +117,25 @@ export class StorefrontService {
     };
   }
 
+  // Página de detalhes de um produto da vitrine. Oculto/congelado/inexistente (ou esgotado, se a loja
+  // esconde os esgotados) responde 404 PRODUCT_NOT_FOUND, igual a um id que nunca existiu.
+  async getProductDetail(handle: string, productId: string): Promise<StorefrontProductDetail> {
+    const store = await this.getOpenStoreOrThrow(handle);
+    const settings = await this.stores.getSettings(store.id);
+    if (!settings) throw storeNotFound();
+
+    const product = await this.storefront.getProduct(store.id, productId, settings.hideOutOfStock);
+    if (!product) throw new AppError('Produto não encontrado.', 404, 'PRODUCT_NOT_FOUND');
+
+    const related = await this.storefront.listRelated(
+      store.id,
+      productId,
+      settings.hideOutOfStock,
+      RELATED_SIZE,
+    );
+    return { product, related };
+  }
+
   // Página inicial da vitrine: banners e textos (padrão ou personalizados) + seções montadas com o
   // estoque da loja (atalhos de categoria, mais vendidos, ofertas e novidades).
   async getHome(handle: string): Promise<StorefrontHome> {
@@ -118,9 +145,10 @@ export class StorefrontService {
 
     const hide = settings.hideOutOfStock;
     const now = this.now();
-    const [overrides, categories, bestSellers, offers] = await Promise.all([
+    const [overrides, categories, brands, bestSellers, offers] = await Promise.all([
       this.storefront.getConfigOverrides(store.id),
       this.storefront.listCategories(store.id, hide),
+      this.storefront.listBrands(store.id, hide),
       this.storefront.listBestSellers(store.id, hide, HOME_SECTION_SIZE, now),
       this.storefront.listOffers(store.id, hide, HOME_SECTION_SIZE, now),
     ]);
@@ -159,6 +187,7 @@ export class StorefrontService {
       },
       config: resolveConfig(store.storeName, overrides),
       categories: categories.slice(0, HOME_CATEGORIES_MAX),
+      brands,
       featured,
       offers,
       newArrivals,

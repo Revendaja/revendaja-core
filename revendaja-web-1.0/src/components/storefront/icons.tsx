@@ -102,3 +102,23 @@ export const BENEFIT_ICON_COMPONENTS: Record<BenefitIcon, (props: SvgProps) => R
   gift: GiftIcon,
   star: StarIcon,
 };
+
+// Coração dos favoritos: vazado, ou preenchido quando o produto está favoritado.
+export function HeartIcon({ size = 20, className, filled = false }: SvgProps & { filled?: boolean }) {
+  return (
+    <svg
+      width={size}
+      height={size}
+      viewBox="0 0 24 24"
+      fill={filled ? 'currentColor' : 'none'}
+      stroke="currentColor"
+      strokeWidth="1.8"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden
+      className={className}
+    >
+      <path d="M12 20.5s-7.5-4.6-9.2-9.4C1.6 7.700 3.700 4.500 7 4.500c2 0 3.400 1 5 3 1.600-2 3-3 5-3 3.300 0 5.400 3.200 4.200 6.600-1.700 4.800-9.200 9.400-9.200 9.400z" />
+    </svg>
+  );
+}

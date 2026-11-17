@@ -1,20 +1,46 @@
 import React from 'react';
-import { View, Text, ScrollView, Pressable, ActivityIndicator, Alert, Linking } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import {
+  View,
+  Text,
+  ScrollView,
+  Pressable,
+  ActivityIndicator,
+  Alert,
+  Linking,
+  Modal,
+  TextInput,
+  KeyboardAvoidingView,
+  Platform,
+  StyleSheet,
+} from 'react-native';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import ProductImage from '../../components/ProductImage';
+import { Banner, PrimaryButton } from '../../components/AuthForm';
 import { ErrorState } from '../../components/ListStates';
 import { SaleDetailSkeleton } from '../../components/Skeleton';
-import { cancelSale, deleteSale, getSale, markSalePaid } from '../../api/sales';
+import { cancelSale, deleteSale, getSale, markSalePaid, updateSale } from '../../api/sales';
 import { getErrorMessage, isApiError } from '../../api/errors';
 import { queryKeys } from '../../api/queryKeys';
-import type { SaleDetail, SaleStatusValue } from '../../api/types';
+import type { NewSalePaymentMethod, SaleDetail, SaleStatusValue } from '../../api/types';
 import { useSubmitting } from '../../hooks/useSubmitting';
 import { useStoreProducts } from '../../products/StoreProductsContext';
 import { useStoreAccessGuard } from '../../products/useStoreAccessGuard';
+import { useAuth } from '../../auth/AuthContext';
 import { formatCurrency, formatWhatsapp, whatsappUrl } from '../../utils/format';
-import { formatDateFull, formatTime, PAYMENT_ICON, paymentLabel } from '../../utils/sales';
+import { buildCustomerMessage } from '../../utils/saleMessage';
+import {
+  formatDateFull,
+  formatTime,
+  isoToInputDate,
+  maskDate,
+  parseSaleDate,
+  PAYMENT_CHIPS,
+  PAYMENT_ICON,
+  paymentLabel,
+  roundMoney,
+} from '../../utils/sales';
 
 // Serve a duas pilhas (Finanças e Mais > Vendas Recentes): só precisa do id da venda e de "voltar".
 type Props = { route: { params: { saleId: string } }; navigation: { goBack: () => void } };
@@ -27,12 +53,22 @@ const STATUS_STYLE: Record<SaleStatusValue, { bg: string; text: string; label: s
 
 export default function SaleDetailScreen({ route, navigation }: Props) {
   const { saleId } = route.params;
+  const insets = useSafeAreaInsets();
   const guard = useStoreAccessGuard();
+  const { store } = useAuth();
   const queryClient = useQueryClient();
   const { applyStockDelta } = useStoreProducts();
   const paying = useSubmitting();
   const cancelling = useSubmitting();
   const deleting = useSubmitting();
+  const saving = useSubmitting();
+
+  // Edição (modal): cliente, pagamento e data. Itens, total e estoque não mudam.
+  const [editing, setEditing] = React.useState(false);
+  const [editName, setEditName] = React.useState('');
+  const [editDate, setEditDate] = React.useState('');
+  const [editPayment, setEditPayment] = React.useState<NewSalePaymentMethod>('pix');
+  const [editError, setEditError] = React.useState<string | null>(null);
 
   const saleQuery = useQuery({
     queryKey: queryKeys.sales.detail(saleId),
@@ -56,6 +92,11 @@ export default function SaleDetailScreen({ route, navigation }: Props) {
 
   const cancelMutation = useMutation({
     mutationFn: () => guard(() => cancelSale(saleId)),
+    onSuccess: invalidateAfterChange,
+  });
+
+  const updateMutation = useMutation({
+    mutationFn: (input: Parameters<typeof updateSale>[1]) => guard(() => updateSale(saleId, input)),
     onSuccess: invalidateAfterChange,
   });
 
@@ -95,6 +136,47 @@ export default function SaleDetailScreen({ route, navigation }: Props) {
   const sale = saleQuery.data;
   const statusStyle = STATUS_STYLE[sale.status];
   const isPending = sale.status === 'pending';
+
+  function openEdit() {
+    setEditName(sale.customerName);
+    setEditDate(isoToInputDate(sale.createdAt));
+    // Venda antiga em "fiado" não é uma opção nova: começa em Pix, mas só envia se o usuário mexer.
+    setEditPayment(sale.paymentMethod === 'on_account' ? 'pix' : sale.paymentMethod);
+    setEditError(null);
+    setEditing(true);
+  }
+
+  function handleSaveEdit() {
+    const name = editName.trim();
+    if (!name || name.length > 120) {
+      setEditError('Informe o nome do cliente (até 120 caracteres).');
+      return;
+    }
+    const input: Parameters<typeof updateSale>[1] = {};
+    if (name !== sale.customerName) input.customerName = name;
+    if (editPayment !== sale.paymentMethod) input.paymentMethod = editPayment;
+    // Só envia a data se ela mudou (assim a hora original da venda é preservada).
+    if (editDate !== isoToInputDate(sale.createdAt)) {
+      const parsed = parseSaleDate(editDate);
+      if (parsed.error || !parsed.iso) {
+        setEditError(parsed.error ?? 'Informe a data da venda.');
+        return;
+      }
+      input.soldAt = parsed.iso;
+    }
+    if (Object.keys(input).length === 0) {
+      setEditing(false);
+      return;
+    }
+    void saving.run(async () => {
+      try {
+        await updateMutation.mutateAsync(input);
+        setEditing(false);
+      } catch (error) {
+        setEditError(getErrorMessage(error));
+      }
+    });
+  }
 
   function handleMarkAsPaid() {
     void paying.run(async () => {
@@ -136,10 +218,10 @@ export default function SaleDetailScreen({ route, navigation }: Props) {
     const message = isPending
       ? 'O pedido some do histórico e o estoque reservado volta para a sua loja. Isso não pode ser desfeito.'
       : 'A venda some do histórico e dos totais. O estoque não muda. Isso não pode ser desfeito.';
-    Alert.alert('Remover esta venda?', message, [
+    Alert.alert('Excluir esta venda?', message, [
       { text: 'Voltar', style: 'cancel' },
       {
-        text: 'Remover',
+        text: 'Excluir',
         style: 'destructive',
         onPress: () => {
           void deleting.run(async () => {
@@ -170,8 +252,21 @@ export default function SaleDetailScreen({ route, navigation }: Props) {
       <ScrollView contentContainerStyle={{ padding: 20, paddingBottom: 32 }}>
         <View className="flex-row items-center justify-between mb-4">
           {backButton}
-          <View className={`rounded-full px-3 py-1.5 ${statusStyle.bg}`}>
-            <Text className={`text-xs font-extrabold ${statusStyle.text}`}>{statusStyle.label}</Text>
+          <View className="flex-row items-center gap-2">
+            <View className={`rounded-full px-3 py-1.5 ${statusStyle.bg}`}>
+              <Text className={`text-xs font-extrabold ${statusStyle.text}`}>{statusStyle.label}</Text>
+            </View>
+            {sale.status !== 'cancelled' && (
+              <Pressable
+                className="flex-row items-center gap-1.5 bg-white rounded-full pl-3 pr-4 py-2.5"
+                onPress={openEdit}
+                accessibilityRole="button"
+                accessibilityLabel="Editar venda"
+              >
+                <Ionicons name="create-outline" size={16} color="#FF6B00" />
+                <Text className="text-primary-600 text-xs font-bold">Editar</Text>
+              </Pressable>
+            )}
           </View>
         </View>
 
@@ -211,7 +306,7 @@ export default function SaleDetailScreen({ route, navigation }: Props) {
           <Pressable
             className="flex-row items-center bg-white rounded-xl p-3 mb-4"
             onPress={() => {
-              Linking.openURL(whatsappUrl(sale.customerWhatsapp ?? '')).catch(() =>
+              Linking.openURL(whatsappUrl(sale.customerWhatsapp ?? '', buildCustomerMessage(sale, store?.storeName ?? null))).catch(() =>
                 Alert.alert('Ops!', 'Não foi possível abrir o WhatsApp.')
               );
             }}
@@ -253,6 +348,19 @@ export default function SaleDetailScreen({ route, navigation }: Props) {
             <Text className="text-sm font-extrabold text-ink-900">{formatCurrency(item.subtotal)}</Text>
           </View>
         ))}
+
+        {sale.discount > 0 && (
+          <View className="bg-white rounded-2xl px-5 py-3.5 mt-3">
+            <View className="flex-row items-center justify-between">
+              <Text className="text-xs text-ink-500">Subtotal</Text>
+              <Text className="text-xs font-semibold text-ink-700">{formatCurrency(roundMoney(sale.total + sale.discount))}</Text>
+            </View>
+            <View className="flex-row items-center justify-between mt-1.5">
+              <Text className="text-xs font-bold text-success">Cupom {sale.couponCode}</Text>
+              <Text className="text-xs font-bold text-success">−{formatCurrency(sale.discount)}</Text>
+            </View>
+          </View>
+        )}
 
         <View
           className={`flex-row items-center justify-between rounded-2xl px-5 py-5 mt-3 ${
@@ -302,8 +410,9 @@ export default function SaleDetailScreen({ route, navigation }: Props) {
         )}
 
         <Pressable
-          className="flex-row items-center justify-center gap-1.5 rounded-2xl h-12 mt-2"
+          className="flex-row items-center justify-center gap-1.5 rounded-2xl h-12 mt-3 bg-danger-bg border border-danger"
           onPress={handleDelete}
+          accessibilityLabel="Excluir venda"
           disabled={paying.loading || cancelling.loading || deleting.loading}
           accessibilityRole="button"
           style={{ opacity: paying.loading || cancelling.loading || deleting.loading ? 0.6 : 1 }}
@@ -313,11 +422,107 @@ export default function SaleDetailScreen({ route, navigation }: Props) {
           ) : (
             <>
               <Ionicons name="trash-outline" size={18} color="#E0453F" />
-              <Text className="text-danger font-bold text-sm">Remover venda</Text>
+              <Text className="text-danger font-extrabold text-sm">Excluir</Text>
             </>
           )}
         </Pressable>
       </ScrollView>
+
+      <Modal
+        visible={editing}
+        transparent
+        animationType="slide"
+        statusBarTranslucent
+        onRequestClose={() => {
+          if (!saving.loading) setEditing(false);
+        }}
+      >
+        <View className="flex-1 justify-end" style={{ backgroundColor: 'rgba(26,27,37,0.55)' }}>
+          <Pressable
+            style={StyleSheet.absoluteFill}
+            onPress={() => !saving.loading && setEditing(false)}
+            accessibilityRole="button"
+            accessibilityLabel="Fechar"
+          />
+
+          <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
+            <View className="bg-white rounded-t-3xl px-5 pt-6" style={{ paddingBottom: insets.bottom + 20 }}>
+              <View className="w-12 h-12 rounded-2xl bg-primary-50 items-center justify-center mb-4">
+                <Ionicons name="create" size={22} color="#FF6B00" />
+              </View>
+
+              <Text className="text-xl font-extrabold text-ink-900 mb-1">Editar venda #{sale.number}</Text>
+              <Text className="text-sm text-ink-400 mb-5">
+                Altere o cliente, a data ou a forma de pagamento. Os produtos e o total não mudam.
+              </Text>
+
+              <Text className="text-xs font-bold text-ink-500 mb-1.5">Nome do cliente</Text>
+              <TextInput
+                value={editName}
+                onChangeText={(text) => {
+                  setEditName(text);
+                  setEditError(null);
+                }}
+                autoCapitalize="words"
+                maxLength={120}
+                editable={!saving.loading}
+                accessibilityLabel="Nome do cliente"
+                className="bg-ink-50 rounded-xl px-4 h-12 text-sm text-ink-900"
+              />
+
+              <Text className="text-xs font-bold text-ink-500 mb-1.5 mt-4">Data da venda</Text>
+              <TextInput
+                value={editDate}
+                onChangeText={(text) => {
+                  setEditDate(maskDate(text));
+                  setEditError(null);
+                }}
+                placeholder="DD/MM/AAAA"
+                placeholderTextColor="#8B8FA3"
+                keyboardType="number-pad"
+                maxLength={10}
+                editable={!saving.loading}
+                accessibilityLabel="Data da venda"
+                className="bg-ink-50 rounded-xl px-4 h-12 text-sm text-ink-900"
+              />
+
+              <Text className="text-xs font-bold text-ink-500 mb-1.5 mt-4">Forma de pagamento</Text>
+              <View className="flex-row flex-wrap mb-5" style={{ gap: 8 }}>
+                {PAYMENT_CHIPS.map(({ method, label }) => {
+                  const active = method === editPayment;
+                  return (
+                    <Pressable
+                      key={method}
+                      onPress={() => setEditPayment(method)}
+                      disabled={saving.loading}
+                      accessibilityRole="button"
+                      accessibilityState={{ selected: active }}
+                      className={`flex-row items-center gap-1.5 px-4 py-3 rounded-xl ${active ? 'bg-primary-500' : 'bg-ink-50'}`}
+                    >
+                      <Ionicons name={PAYMENT_ICON[method]} size={15} color={active ? '#fff' : '#8B8FA3'} />
+                      <Text className={`text-sm font-extrabold ${active ? 'text-white' : 'text-ink-700'}`}>{label}</Text>
+                    </Pressable>
+                  );
+                })}
+              </View>
+
+              {editError && <Banner type="error" message={editError} className="mb-3" />}
+
+              <PrimaryButton label="Salvar alterações" onPress={handleSaveEdit} loading={saving.loading} />
+
+              <Pressable
+                onPress={() => setEditing(false)}
+                disabled={saving.loading}
+                hitSlop={8}
+                className="items-center mt-4"
+                accessibilityRole="button"
+              >
+                <Text className="text-sm font-bold text-ink-400">Cancelar</Text>
+              </Pressable>
+            </View>
+          </KeyboardAvoidingView>
+        </View>
+      </Modal>
     </SafeAreaView>
   );
 }

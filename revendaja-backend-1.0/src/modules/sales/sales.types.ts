@@ -36,6 +36,9 @@ export interface SaleItem {
 
 export interface Sale extends SaleListItem {
   items: SaleItem[];
+  // Desconto de cupom já abatido do `total` (0 = sem cupom) e o código usado (cópia da hora).
+  discount: number;
+  couponCode: string | null;
   // Só com `fulfillment = delivery`.
   deliveryAddress: string | null;
   // Entrega paga em dinheiro: "troco para quanto". null = não precisa de troco.
@@ -54,9 +57,21 @@ export interface CreateSaleData {
   installments: number | null;
   status: SaleStatus;
   source: SaleSource;
+  // Data da venda; ausente = o banco usa a data de criação (agora).
+  soldAt?: Date;
+  // Cupom do pedido (já normalizado). O servidor confere e calcula o desconto dentro da transação.
+  couponCode?: string | null;
   // true = só vende produto visível na vitrine (`isActive`). Pedido online exige; a venda feita pela loja não.
   onlyActiveProducts: boolean;
   items: { storeProductId: string; quantity: number }[];
+}
+
+// Campos editáveis de uma venda já registrada (só os presentes são gravados).
+export interface UpdateSaleData {
+  customerName?: string;
+  paymentMethod?: PaymentMethod;
+  installments?: number | null;
+  soldAt?: Date;
 }
 
 // Pedido feito pelo cliente na vitrine online (já validado pela rota pública).
@@ -71,6 +86,7 @@ export interface OnlineOrderInput {
   cashChangeFor?: number | null;
   paymentMethod: 'pix' | 'card' | 'cash';
   installments?: number | null;
+  couponCode?: string | null;
   items: { storeProductId: string; quantity: number }[];
 }
 
@@ -90,6 +106,8 @@ export type CreateSaleResult =
   | { kind: 'product_not_found' }
   | { kind: 'insufficient_stock'; productName: string; available: number }
   | { kind: 'total_too_large' }
+  // Cupom que não vale para este pedido (não existe, venceu, esgotou, abaixo do mínimo...).
+  | { kind: 'coupon_invalid'; message: string }
   // O troco pedido é menor que o total do pedido (o total só é conhecido ao gravar).
   | { kind: 'change_too_low'; total: number };
 
@@ -108,6 +126,8 @@ export interface PeriodTotals {
 // Dados crus do período; as contas (lucro, margem) ficam em `buildSalesSummary`.
 export interface SummaryData extends PeriodTotals {
   paidItems: SummaryItemRow[];
+  // Soma dos descontos de cupom das vendas PAGAS do período, em centavos (reduz o lucro).
+  paidDiscountCents: number;
 }
 
 export interface SalesSummary {

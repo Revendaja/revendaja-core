@@ -1,6 +1,11 @@
 import type { FastifyReply, FastifyRequest } from 'fastify';
 import { storefrontService } from './storefront.service';
-import type { OnlineOrderBody, StorefrontParams, StorefrontQuery } from './storefront.schema';
+import type {
+  OnlineOrderBody,
+  StorefrontParams,
+  StorefrontProductParams,
+  StorefrontQuery,
+} from './storefront.schema';
 import type { UpdateStorefrontConfigInput } from './storefront.config';
 
 export async function getStorefront(
@@ -9,6 +14,14 @@ export async function getStorefront(
 ) {
   const storefront = await storefrontService.getStorefront(request.params.handle, request.query);
   return reply.send(storefront);
+}
+
+export async function getStorefrontProduct(
+  request: FastifyRequest<{ Params: StorefrontProductParams }>,
+  reply: FastifyReply,
+) {
+  const { handle, productId } = request.params;
+  return reply.send(await storefrontService.getProductDetail(handle, productId));
 }
 
 export async function recordVisit(

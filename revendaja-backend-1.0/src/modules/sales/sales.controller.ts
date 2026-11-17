@@ -9,6 +9,7 @@ import type {
   StaleProductsQuery,
   TopBrandsQuery,
   TopProductsQuery,
+  UpdateSaleInput,
   UpdateSaleStatusBody,
 } from './sales.schema';
 
@@ -92,6 +93,14 @@ export async function updateSaleStatus(
     request.body.status === 'paid'
       ? await salesService.markPaid(userId, id)
       : await salesService.cancel(userId, id);
+  return reply.send(sale);
+}
+
+export async function updateSale(
+  request: FastifyRequest<{ Params: SaleParams; Body: UpdateSaleInput }>,
+  reply: FastifyReply,
+) {
+  const sale = await salesService.update(request.userId as string, request.params.id, request.body);
   return reply.send(sale);
 }
 

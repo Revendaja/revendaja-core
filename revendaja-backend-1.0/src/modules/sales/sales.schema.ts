@@ -26,6 +26,14 @@ export const saleItemsSchema = z
   .min(1)
   .max(MAX_ITEMS_PER_SALE);
 
+// Data da venda em ISO-8601. Não pode ser no futuro (tolerância de 5 min para diferença de relógio).
+const soldAtSchema = z.iso
+  .datetime({ offset: true })
+  .transform((value) => new Date(value))
+  .refine((date) => date.getTime() <= Date.now() + 5 * 60 * 1000, {
+    message: 'A data da venda não pode estar no futuro.',
+  });
+
 export const createSaleSchema = z
   .object({
     // Gerado pelo app (UUID) a cada tentativa de "finalizar venda": repetir o
@@ -37,11 +45,31 @@ export const createSaleSchema = z
     // Só para cartão. Ausente no cartão = 1 parcela. null é tratado como ausente.
     installments: z.number().int().min(1).max(MAX_INSTALLMENTS).nullish(),
     items: saleItemsSchema,
+    // Data da venda (ISO-8601). Ausente/null = agora.
+    soldAt: soldAtSchema.nullish(),
   })
   .refine((data) => data.installments == null || data.paymentMethod === 'card', {
     message: 'Parcelas só se aplicam ao pagamento no cartão.',
     path: ['installments'],
   });
+
+// Edição dos dados da venda (cliente, pagamento, data). Os itens não mudam aqui: mexer neles exigiria
+// reajustar estoque e total. Todos os campos são opcionais, mas ao menos um precisa vir.
+export const updateSaleSchema = z
+  .object({
+    customerName: z.string().trim().min(1).max(120).optional(),
+    paymentMethod: createPaymentMethodSchema.optional(),
+    installments: z.number().int().min(1).max(MAX_INSTALLMENTS).nullish(),
+    soldAt: soldAtSchema.optional(),
+  })
+  .refine(
+    (data) =>
+      data.customerName !== undefined ||
+      data.paymentMethod !== undefined ||
+      data.installments !== undefined ||
+      data.soldAt !== undefined,
+    { message: 'Informe ao menos um campo para alterar.' },
+  );
 
 // Datas ISO-8601 estritas (com 'Z' ou offset, ex.: 2026-09-01T03:00:00.000Z ou
 // 2026-09-01T00:00:00-03:00). `from` é inclusivo e `to` é exclusivo.
@@ -108,6 +136,8 @@ export const saleItemResponseSchema = z.object({
 
 export const saleResponseSchema = saleListItemResponseSchema.extend({
   items: z.array(saleItemResponseSchema),
+  discount: z.number(),
+  couponCode: z.string().nullable(),
   deliveryAddress: z.string().nullable(),
   cashChangeFor: z.number().nullable(),
 });
@@ -224,6 +254,7 @@ export type CreateSaleInput = z.infer<typeof createSaleSchema>;
 export type ListSalesQuery = z.infer<typeof listSalesQuerySchema>;
 export type SalesSummaryQuery = z.infer<typeof salesSummaryQuerySchema>;
 export type SaleParams = z.infer<typeof saleParamsSchema>;
+export type UpdateSaleInput = z.infer<typeof updateSaleSchema>;
 export type UpdateSaleStatusBody = z.infer<typeof updateSaleStatusSchema>;
 export type SalesTimelineQuery = z.infer<typeof salesTimelineQuerySchema>;
 export type TopProductsQuery = z.infer<typeof topProductsQuerySchema>;

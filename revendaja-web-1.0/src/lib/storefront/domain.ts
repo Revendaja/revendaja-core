@@ -36,3 +36,9 @@ export function storeHandleFromHost(hostHeader: string | null | undefined): stri
 export function storeUrl(handle: string): string {
   return `${isLocalStoreDomain ? 'http' : 'https'}://${handle}.${STORE_BASE_DOMAIN}`;
 }
+
+// Link de uma página da plataforma (ex.: /privacidade) a partir da vitrine. Na vitrine (subdomínio) todo
+// caminho é reescrito para /s/[handle]/..., então o link precisa apontar para o domínio principal.
+export function platformUrl(path: string): string {
+  return `${isLocalStoreDomain ? 'http' : 'https'}://${STORE_BASE_DOMAIN}${path}`;
+}

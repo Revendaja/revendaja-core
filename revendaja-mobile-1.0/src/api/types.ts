@@ -178,7 +178,21 @@ export type SaleListItem = {
 };
 
 // A resposta de venda não traz custo, lucro nem margem.
-export type SaleDetail = SaleListItem & { items: SaleItemDetail[] };
+// Como o cliente recebe o pedido da vitrine.
+export type FulfillmentMethod = 'pickup' | 'delivery';
+
+export type SaleDetail = SaleListItem & {
+  items: SaleItemDetail[];
+  // Só o pedido online informa (retirada ou entrega). null = venda registrada pela própria loja.
+  fulfillment: FulfillmentMethod | null;
+  // Só com `fulfillment = delivery`.
+  deliveryAddress: string | null;
+  // Entrega paga em dinheiro: "troco para quanto". null = não precisa de troco.
+  cashChangeFor: number | null;
+  // Desconto de cupom já abatido do `total` (0 = sem cupom) e o código usado.
+  discount: number;
+  couponCode: string | null;
+};
 
 export type SalesSummary = {
   // Todas as vendas do período (pagas + pendentes), pela data de criação.
@@ -268,7 +282,18 @@ export type CreateSaleInput = {
   paymentMethod: NewSalePaymentMethod;
   // Só com `card` (1 a 24). Com outro método a API responde 400.
   installments?: number;
+  // Data da venda (ISO). Sem ela, o servidor usa agora.
+  soldAt?: string;
   items: { storeProductId: string; quantity: number }[];
+};
+
+// Edição dos dados da venda (itens, total e estoque não mudam). Só os campos enviados são alterados.
+export type UpdateSaleInput = {
+  customerName?: string;
+  paymentMethod?: NewSalePaymentMethod;
+  // Só com `card`. Trocar para cartão sem informar = 1x; sair do cartão zera.
+  installments?: number | null;
+  soldAt?: string;
 };
 
 // ---------------------------------------------------------------------------
@@ -310,3 +335,47 @@ export type AppNotification = {
   readAt: string | null;
   createdAt: string;
 };
+
+// ---------------------------------------------------------------------------
+// Cupons de desconto (GET/POST /store/coupons)
+// ---------------------------------------------------------------------------
+
+export type CouponType = 'percent' | 'fixed';
+
+export type Coupon = {
+  id: string;
+  // Sempre em MAIÚSCULAS, único na loja.
+  code: string;
+  type: CouponType;
+  // percent: 1 a 100 (%); fixed: reais.
+  value: number;
+  // Pedido mínimo (soma dos produtos). null = sem mínimo.
+  minOrder: number | null;
+  // Limite de usos no total. null = ilimitado.
+  maxUses: number | null;
+  usedCount: number;
+  // Último instante em que vale. null = não expira.
+  expiresAt: string | null;
+  isActive: boolean;
+  createdAt: string;
+};
+
+export type CreateCouponInput = {
+  code: string;
+  type: CouponType;
+  value: number;
+  minOrder?: number | null;
+  maxUses?: number | null;
+  // ISO-8601. Ausente/null = não expira.
+  expiresAt?: string | null;
+};
+
+// Código e tipo não mudam. `null` tira o mínimo / o limite / a validade.
+export type UpdateCouponInput = {
+  value?: number;
+  minOrder?: number | null;
+  maxUses?: number | null;
+  expiresAt?: string | null;
+  isActive?: boolean;
+};
+

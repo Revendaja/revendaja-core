@@ -1,6 +1,13 @@
 import { request } from './http';
 import { buildQuery } from '../utils/dates';
-import type { CreateOrderInput, OnlineOrderReceipt, Storefront, StorefrontHome } from './types';
+import type {
+  CouponPreview,
+  CreateOrderInput,
+  OnlineOrderReceipt,
+  Storefront,
+  StorefrontHome,
+  StorefrontProductDetail,
+} from './types';
 
 export const STOREFRONT_PAGE_SIZE = 24;
 
@@ -40,8 +47,25 @@ export function createStorefrontOrder(handle: string, input: CreateOrderInput) {
   });
 }
 
+// Confere um cupom contra os itens do carrinho e devolve o desconto. O servidor calcula o subtotal
+// com os preços da loja; o uso do cupom só é consumido ao fazer o pedido. 400 `COUPON_INVALID` com a
+// mensagem do motivo (vencido, esgotado, abaixo do mínimo...).
+export function previewCoupon(handle: string, input: { code: string; items: { storeProductId: string; quantity: number }[] }) {
+  return request<CouponPreview>(`/public/stores/${encodeURIComponent(handle)}/coupons/validate`, {
+    method: 'POST',
+    body: input,
+  });
+}
+
 // Página inicial: banners/textos (padrão ou personalizados), atalhos de categoria e as seções
 // montadas com o estoque da loja.
 export function getStorefrontHome(handle: string) {
   return request<StorefrontHome>(`/public/stores/${encodeURIComponent(handle)}/home`);
+}
+
+// Detalhes de um produto da vitrine + parecidos. 404 (PRODUCT_NOT_FOUND) se foi ocultado ou não existe.
+export function getStorefrontProduct(handle: string, productId: string) {
+  return request<StorefrontProductDetail>(
+    `/public/stores/${encodeURIComponent(handle)}/products/${encodeURIComponent(productId)}`,
+  );
 }

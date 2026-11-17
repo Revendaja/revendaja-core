@@ -32,6 +32,16 @@ export const DEFAULT_BANNERS = [
     mobile: '/banners/floratta-gold-mobile.webp',
     link: { type: 'section', section: 'catalog' },
   },
+  {
+    desktop: '/banners/luna-desktop.webp',
+    mobile: '/banners/luna-mobile.webp',
+    link: { type: 'section', section: 'catalog' },
+  },
+  {
+    desktop: '/banners/malbec-desktop.webp',
+    mobile: '/banners/malbec-mobile.webp',
+    link: { type: 'section', section: 'catalog' },
+  },
 ] as const;
 
 // Fotos de exemplo antigas: lojas que as salvaram ao editar os banners ainda precisam validar.

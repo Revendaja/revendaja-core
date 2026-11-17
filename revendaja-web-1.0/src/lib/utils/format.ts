@@ -10,9 +10,10 @@ export function formatWhatsapp(digits: string) {
   return digits;
 }
 
-export function whatsappUrl(digits: string) {
+// Com `message`, a conversa abre com o texto já preenchido (o cliente só precisa enviar).
+export function whatsappUrl(digits: string, message?: string) {
   const withCountry = digits.length <= 11 ? `55${digits}` : digits;
-  return `https://wa.me/${withCountry}`;
+  return message ? `https://wa.me/${withCountry}?text=${encodeURIComponent(message)}` : `https://wa.me/${withCountry}`;
 }
 
 // Sem centavos, para valores redondos como a meta de vendas: 5000 -> "R$ 5.000".

@@ -5,7 +5,8 @@ import type { SalesSummary, SummaryData } from './sales.types';
 // para os dois nunca divergirem:
 //  - grossRevenue: soma do total de TODAS as vendas do período (pagas + pendentes);
 //  - pendingTotal: soma das pendentes;
-//  - profit: só itens de vendas PAGAS que têm custo, soma de (preço - custo) * qtd;
+//  - profit: só itens de vendas PAGAS que têm custo, soma de (preço - custo) * qtd, menos os
+//    descontos de cupom das vendas pagas;
 //    null se nenhum item tiver custo;
 //  - marginPercent: profit / (preço * qtd dos mesmos itens) * 100; null sem lucro;
 //  - profitIsPartial: existe item pago sem custo (o lucro ignora esses itens).
@@ -23,6 +24,12 @@ export function buildSalesSummary(data: SummaryData): SalesSummary {
     hasCostedItem = true;
     profitCents += (item.unitPriceCents - item.unitCostCents) * item.quantity;
     costedRevenueCents += item.unitPriceCents * item.quantity;
+  }
+
+  // O desconto de cupom sai da venda inteira: abate o lucro e a receita dos itens com custo.
+  if (hasCostedItem) {
+    profitCents -= data.paidDiscountCents;
+    costedRevenueCents -= data.paidDiscountCents;
   }
 
   return {

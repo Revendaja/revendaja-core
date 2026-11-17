@@ -1,6 +1,8 @@
 import type { Prisma } from '@prisma/client';
 import { isUniqueViolation } from '../../database/errors';
 import { prisma } from '../../database/prisma';
+import { evaluateCoupon } from '../coupons/coupons.discount';
+import { mapCoupon } from '../coupons/coupons.repository';
 import { fromCents, toCents } from './sales.money';
 import type {
   CancelSaleResult,
@@ -18,6 +20,7 @@ import type {
   TimelineSaleRow,
   TopBrand,
   TopProduct,
+  UpdateSaleData,
 } from './sales.types';
 
 // Teto do total da venda: DECIMAL(12,2) no banco (até 9.999.999.999,99).
@@ -64,6 +67,8 @@ function mapSale(row: SaleWithItems): Sale {
     }),
     deliveryAddress: row.deliveryAddress,
     cashChangeFor: row.cashChangeFor === null ? null : row.cashChangeFor.toNumber(),
+    discount: row.discount.toNumber(),
+    couponCode: row.couponCode,
   };
 }
 
@@ -215,10 +220,50 @@ export const salesRepository = {
             return { item, storeProduct, unitPrice };
           });
           if (totalCents > MAX_TOTAL_CENTS) throw new SaleAbort({ kind: 'total_too_large' });
+
+          // Cupom: conferido AQUI, sobre o total calculado com os preços do banco (nunca o do
+          // cliente). O uso é consumido num UPDATE condicional (`usedCount < maxUses`), então dois
+          // pedidos ao mesmo tempo não passam do limite; se o pedido falhar depois, a transação
+          // inteira desfaz — inclusive o uso do cupom.
+          let discountCents = 0;
+          let couponId: string | null = null;
+          let couponCode: string | null = null;
+          if (data.couponCode) {
+            const row = await tx.coupon.findUnique({
+              where: { storeId_code: { storeId: data.storeId, code: data.couponCode } },
+            });
+            const coupon = row ? mapCoupon(row) : null;
+            const check = evaluateCoupon(coupon, totalCents, now);
+            if (!check.ok || !coupon) {
+              throw new SaleAbort({
+                kind: 'coupon_invalid',
+                message: check.ok ? 'Cupom inválido ou expirado.' : check.message,
+              });
+            }
+            const { count: used } = await tx.coupon.updateMany({
+              where: {
+                id: coupon.id,
+                isActive: true,
+                ...(coupon.maxUses !== null ? { usedCount: { lt: coupon.maxUses } } : {}),
+              },
+              data: { usedCount: { increment: 1 } },
+            });
+            if (used === 0) {
+              throw new SaleAbort({
+                kind: 'coupon_invalid',
+                message: 'Este cupom já atingiu o limite de usos.',
+              });
+            }
+            discountCents = check.discountCents;
+            couponId = coupon.id;
+            couponCode = coupon.code;
+          }
+          const finalCents = totalCents - discountCents;
+
           // Troco para menos que o total não faz sentido. O total só é conhecido aqui (o preço vem
-          // do banco, nunca do cliente).
-          if (data.cashChangeFor !== null && toCents(data.cashChangeFor) < totalCents) {
-            throw new SaleAbort({ kind: 'change_too_low', total: fromCents(totalCents) });
+          // do banco, nunca do cliente) e já é o valor DEPOIS do desconto.
+          if (data.cashChangeFor !== null && toCents(data.cashChangeFor) < finalCents) {
+            throw new SaleAbort({ kind: 'change_too_low', total: fromCents(finalCents) });
           }
 
           // Um único mapa "storeProductId -> quantidade a debitar", somando a quantidade vendida
@@ -283,7 +328,12 @@ export const salesRepository = {
               installments: data.installments,
               status: data.status,
               source: data.source,
-              total: fromCents(totalCents),
+              // Sem data informada, o default do banco (now) vale.
+              ...(data.soldAt ? { createdAt: data.soldAt } : {}),
+              total: fromCents(finalCents),
+              discount: fromCents(discountCents),
+              couponId,
+              couponCode,
               items: {
                 create: lines.map(({ item, storeProduct, unitPrice }) => ({
                   storeProductId: item.storeProductId,
@@ -356,6 +406,15 @@ export const salesRepository = {
         });
 
         if (count === 1) {
+          // Pedido cancelado devolve o uso do cupom (senão um cupom de uso único se perderia).
+          const cancelled = await tx.sale.findUnique({ where: { id }, select: { couponId: true } });
+          if (cancelled?.couponId) {
+            await tx.coupon.updateMany({
+              where: { id: cancelled.couponId, usedCount: { gt: 0 } },
+              data: { usedCount: { decrement: 1 } },
+            });
+          }
+
           const items = await tx.saleItem.findMany({
             where: { saleId: id },
             select: {
@@ -422,6 +481,20 @@ export const salesRepository = {
     return findSaleById(storeId, id);
   },
 
+  // Grava só os campos informados. Devolve null se a venda não existe nesta loja.
+  async updateDetails(storeId: string, id: string, data: UpdateSaleData): Promise<Sale | null> {
+    const { count } = await prisma.sale.updateMany({
+      where: { id, storeId },
+      data: {
+        ...(data.customerName !== undefined ? { customerName: data.customerName } : {}),
+        ...(data.paymentMethod !== undefined ? { paymentMethod: data.paymentMethod } : {}),
+        ...(data.installments !== undefined ? { installments: data.installments } : {}),
+        ...(data.soldAt !== undefined ? { createdAt: data.soldAt } : {}),
+      },
+    });
+    return count === 0 ? null : findSaleById(storeId, id);
+  },
+
   periodTotals,
 
   // Quantas vendas da loja vieram de `source` (ex.: pedidos feitos pelo cliente na vitrine), em qualquer
@@ -445,16 +518,21 @@ export const salesRepository = {
   ): Promise<SummaryData> {
     const createdAt = { gte: from, lt: to };
 
-    const [totals, paidItems] = await Promise.all([
+    const [totals, paidItems, paidDiscounts] = await Promise.all([
       periodTotals(storeId, from, to, source),
       prisma.saleItem.findMany({
         where: { sale: { storeId, status: 'paid', createdAt, ...(source ? { source } : {}) } },
         select: { unitPrice: true, unitCost: true, quantity: true },
       }),
+      prisma.sale.aggregate({
+        where: { storeId, status: 'paid', createdAt, ...(source ? { source } : {}) },
+        _sum: { discount: true },
+      }),
     ]);
 
     return {
       ...totals,
+      paidDiscountCents: toCents(paidDiscounts._sum.discount?.toNumber() ?? 0),
       paidItems: paidItems.map((item) => ({
         unitPriceCents: toCents(item.unitPrice.toNumber()),
         unitCostCents: item.unitCost === null ? null : toCents(item.unitCost.toNumber()),

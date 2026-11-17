@@ -1,5 +1,6 @@
 import { z } from 'zod';
 import { storefrontConfigSchema } from './storefront.config';
+import { normalizeCouponCode } from '../coupons/coupons.discount';
 import {
   createPaymentMethodSchema,
   fulfillmentSchema,
@@ -11,6 +12,10 @@ import {
 // O usuário (handle) da loja na URL da vitrine: sempre minúsculo.
 export const storefrontParamsSchema = z.object({
   handle: z.string().trim().toLowerCase().min(1).max(60),
+});
+
+export const storefrontProductParamsSchema = storefrontParamsSchema.extend({
+  productId: z.string().uuid(),
 });
 
 export const storefrontQuerySchema = z.object({
@@ -51,6 +56,8 @@ export const onlineOrderSchema = z
     // Só entrega paga em dinheiro: "troco para quanto" (a nota que o cliente vai entregar).
     // Ausente/null = não precisa de troco. Que seja >= total do pedido, só o servidor sabe checar.
     cashChangeFor: z.number().positive().max(MAX_CHANGE_FOR).nullish(),
+    // Cupom de desconto digitado no carrinho. O servidor confere e calcula o desconto ao gravar.
+    couponCode: z.string().max(40).transform(normalizeCouponCode).nullish(),
     items: saleItemsSchema,
   })
   .superRefine((data, ctx) => {
@@ -101,6 +108,11 @@ const storefrontProductSchema = z.object({
   isNew: z.boolean(),
 });
 
+export const storefrontProductDetailResponseSchema = z.object({
+  product: storefrontProductSchema,
+  related: z.array(storefrontProductSchema),
+});
+
 export const storefrontResponseSchema = z.object({
   store: z.object({
     storeName: z.string(),
@@ -117,6 +129,20 @@ export const storefrontResponseSchema = z.object({
   }),
 });
 
+const storefrontCategoryShortcutSchema = z.object({
+  type: z.enum(['category', 'brand']),
+  id: z.string(),
+  name: z.string(),
+  count: z.number().int(),
+  image: z.string().nullable(),
+});
+
+const storefrontBrandSchema = z.object({
+  id: z.number().int(),
+  name: z.string(),
+  logo: z.string(),
+});
+
 export const storefrontHomeResponseSchema = z.object({
   store: z.object({
     storeName: z.string(),
@@ -127,15 +153,14 @@ export const storefrontHomeResponseSchema = z.object({
     hideBranding: z.boolean(),
   }),
   config: storefrontConfigSchema,
+  // Categoria traz as marcas dos produtos dela em `children` (menu pai > filho).
   categories: z.array(
-    z.object({
-      type: z.enum(['category', 'brand']),
-      id: z.string(),
-      name: z.string(),
-      count: z.number().int(),
-      image: z.string().nullable(),
+    storefrontCategoryShortcutSchema.extend({
+      children: z.array(storefrontCategoryShortcutSchema).optional(),
     }),
   ),
+  // Marcas (só as que têm logo) dos produtos visíveis, as mais presentes primeiro.
+  brands: z.array(storefrontBrandSchema),
   featured: z.array(storefrontProductSchema),
   offers: z.object({
     products: z.array(storefrontProductSchema),
@@ -167,6 +192,9 @@ export const onlineOrderResponseSchema = z.object({
   fulfillment: fulfillmentSchema,
   deliveryAddress: z.string().nullable(),
   cashChangeFor: z.number().nullable(),
+  // Desconto de cupom já abatido do `total` (0 = sem cupom) e o código usado.
+  discount: z.number(),
+  couponCode: z.string().nullable(),
   createdAt: z.date(),
   expiresAt: z.date(),
   items: z.array(
@@ -187,3 +215,5 @@ export const storeStatsResponseSchema = z.object({
 export type StorefrontParams = z.infer<typeof storefrontParamsSchema>;
 export type StorefrontQuery = z.infer<typeof storefrontQuerySchema>;
 export type OnlineOrderBody = z.infer<typeof onlineOrderSchema>;
+
+export type StorefrontProductParams = z.infer<typeof storefrontProductParamsSchema>;

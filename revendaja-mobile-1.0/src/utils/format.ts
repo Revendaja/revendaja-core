@@ -16,9 +16,10 @@ export function formatWhatsapp(digits: string) {
 }
 
 // Link para abrir a conversa no WhatsApp. Sem o 55 (DDD + número), acrescenta o do Brasil.
-export function whatsappUrl(digits: string) {
+// Com `message`, a conversa abre com o texto já preenchido (o cliente só precisa enviar).
+export function whatsappUrl(digits: string, message?: string) {
   const withCountry = digits.length <= 11 ? `55${digits}` : digits;
-  return `https://wa.me/${withCountry}`;
+  return message ? `https://wa.me/${withCountry}?text=${encodeURIComponent(message)}` : `https://wa.me/${withCountry}`;
 }
 
 // Data relativa curta pra notificação: "agora", "há 5 min", "há 2h", "ontem" ou "23/09".

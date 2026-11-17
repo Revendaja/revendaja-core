@@ -262,6 +262,10 @@ describe('GET /public/stores/:handle/home (página inicial da vitrine, sem login
           name: 'Presentes',
           count: 1,
           image: 'https://img/a-sm.jpg',
+          // Filhos no menu: as marcas dos produtos que estão na categoria.
+          children: [
+            { type: 'brand', id: '1', name: 'Natura', count: 1, image: 'https://img/a-sm.jpg' },
+          ],
         },
       ]);
     });
