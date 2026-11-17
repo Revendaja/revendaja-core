@@ -1,5 +1,10 @@
 import { prisma } from '../../../database/prisma';
-import { barcodeCandidates, buildProductSearchFilter, findFuzzyProductIds } from '../catalog.search';
+import {
+  barcodeCandidates,
+  buildProductSearchFilter,
+  correctToken,
+  findFuzzyProductIds,
+} from '../catalog.search';
 
 jest.mock('../../../database/prisma', () => ({
   prisma: { $queryRaw: jest.fn() },
@@ -50,6 +55,23 @@ describe('barcodeCandidates', () => {
   });
 });
 
+// A query é montada com fragmentos `Prisma.sql` aninhados: junta o texto e os valores de tudo.
+function flatten(sql: { sql?: string; values?: unknown[] }): { text: string; values: unknown[] } {
+  return { text: sql.sql ?? '', values: sql.values ?? [] };
+}
+function queryText(): string {
+  const call = queryRawMock.mock.calls[0];
+  return [
+    String(call[0]),
+    ...call.slice(1).map((a: unknown) => (a && typeof a === 'object' ? flatten(a).text : '')),
+  ].join(' ');
+}
+function queryValues(): unknown[] {
+  return queryRawMock.mock.calls[0]
+    .slice(1)
+    .flatMap((a: unknown) => (a && typeof a === 'object' ? flatten(a).values : [a]));
+}
+
 describe('findFuzzyProductIds', () => {
   it('busca por similaridade (word_similarity + unaccent) e devolve os ids na ordem do banco', async () => {
     queryRawMock.mockResolvedValue([{ id: 3 }, { id: 1 }]);
@@ -75,9 +97,37 @@ describe('findFuzzyProductIds', () => {
 
     await findFuzzyProductIds('deo');
 
-    const sql = String(queryRawMock.mock.calls[0][0]);
+    const sql = queryText();
     expect(sql).toContain('strpos(unaccent(lower(p.name))');
     expect(sql).toContain('word_similarity(unaccent(lower(');
+  });
+
+  // "perfume masculino": CADA palavra precisa combinar (E), senão um hidratante que só diz
+  // "masculino" entrava. Cada palavra tem sua condição, ligadas por AND.
+  it('várias palavras: todas precisam combinar (AND), cada uma com a sua condição', async () => {
+    queryRawMock.mockResolvedValue([]);
+
+    await findFuzzyProductIds('perfume masculino');
+
+    const sql = queryText();
+    expect(sql).toContain(') AND (');
+    expect(sql.split('word_similarity(').length - 1).toBeGreaterThanOrEqual(2);
+  });
+
+  it('"perfume" aceita também Eau de Toilette/Colônia, mas não "perfumado"', async () => {
+    queryRawMock.mockResolvedValue([]);
+
+    await findFuzzyProductIds('perfume');
+
+    const values = queryValues();
+    expect(values).toContain('eau de toilette');
+    expect(values).toContain('colonia');
+    expect(values).not.toContain('perfumado');
+  });
+
+  it('busca em branco não consulta o banco', async () => {
+    await expect(findFuzzyProductIds('   ')).resolves.toEqual([]);
+    expect(queryRawMock).not.toHaveBeenCalled();
   });
 
   // Termo comum ("parfum", "deo") casa com milhares de itens do catálogo; se o teto de resultados
@@ -146,5 +196,23 @@ describe('buildProductSearchFilter', () => {
 
     const barcodeClause = filter.OR.find((clause) => clause.barCode);
     expect(Object.keys(barcodeClause?.barCode ?? {})).toEqual(['in']);
+  });
+});
+
+describe('correctToken', () => {
+  it.each([
+    ['prefume', 'perfume'],
+    ['madsculino', 'masculino'],
+    ['femminino', 'feminino'],
+    ['hidrantante', 'hidratante'],
+  ])('corrige "%s" para "%s"', (typed, expected) => {
+    expect(correctToken(typed)).toBe(expected);
+  });
+
+  it('palavra certa, prefixo e nome de marca ficam como estão', () => {
+    expect(correctToken('perfume')).toBe('perfume');
+    expect(correctToken('perfum')).toBe('perfum');
+    expect(correctToken('malbec')).toBe('malbec');
+    expect(correctToken('kaiak')).toBe('kaiak');
   });
 });

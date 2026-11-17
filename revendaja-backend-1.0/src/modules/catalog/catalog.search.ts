@@ -1,4 +1,4 @@
-import type { Prisma } from '@prisma/client';
+import { Prisma } from '@prisma/client';
 import { prisma } from '../../database/prisma';
 
 // Do EAN-8 ao GTIN-14: só dígitos, de 8 a 14. Termos mais curtos (ex.: "12")
@@ -40,13 +40,155 @@ export function barcodeCandidates(digits: string): string[] {
 // Com `storeId`, só considera produtos que a loja tem: o teto de FUZZY_LIMIT vale para o resultado
 // DA LOJA, não do catálogo inteiro (senão um termo comum como "parfum" ou "deo", que casa com
 // milhares de itens, cortava fora o produto da loja antes de o filtro por loja ser aplicado).
+// Sinônimos do vocabulário de perfumaria: quem digita "perfume" aceita "Eau de Toilette"/"Colônia",
+// "masculino" aceita "Homem"/"For Men" etc. Só termos seguros (sem "man"/"men", que casariam com
+// "romantic"/"mandarina"). Não incluem "perfumado", pra "perfume" não trazer hidratante perfumado.
+const SYNONYMS: Record<string, string[]> = {
+  perfume: ['parfum', 'colonia', 'eau de toilette', 'eau de cologne'],
+  perfumes: ['parfum', 'colonia', 'eau de toilette', 'eau de cologne'],
+  colonia: ['eau de toilette', 'eau de cologne'],
+  masculino: ['homem', 'pour homme', 'for men', 'for him'],
+  masculina: ['homem', 'pour homme', 'for men', 'for him'],
+  feminino: ['mulher', 'femme', 'for women', 'for her'],
+  feminina: ['mulher', 'femme', 'for women', 'for her'],
+};
+
+// Palavras comuns de perfumaria, só pra corrigir erro de digitação ("prefume", "madsculino"): a
+// similaridade por trigramas não separa "prefume~perfume" de "prefume~presente" (mesma nota), mas a
+// distância de edição separa. Palavras fora da lista (marcas, nomes de produto) seguem pela similaridade.
+const VOCABULARY = [
+  'perfume',
+  'perfumes',
+  'masculino',
+  'masculina',
+  'masculinos',
+  'feminino',
+  'feminina',
+  'femininos',
+  'colonia',
+  'hidratante',
+  'desodorante',
+  'antitranspirante',
+  'sabonete',
+  'shampoo',
+  'condicionador',
+  'creme',
+  'presente',
+  'batom',
+  'esmalte',
+  'protetor',
+  'maquiagem',
+  'infantil',
+  'unissex',
+  'corporal',
+  'facial',
+  'barba',
+  'locao',
+  'mascara',
+  'oleo',
+  'spray',
+  'cabelo',
+  'kit',
+];
+
+function plain(text: string): string {
+  return text.normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase();
+}
+
+// Distância de edição com troca de letras vizinhas ("prefume" -> "perfume" = 1).
+function editDistance(a: string, b: string): number {
+  const d: number[][] = Array.from({ length: a.length + 1 }, (_, i) => [
+    i,
+    ...Array(b.length).fill(0),
+  ]);
+  for (let j = 0; j <= b.length; j++) d[0][j] = j;
+  for (let i = 1; i <= a.length; i++) {
+    for (let j = 1; j <= b.length; j++) {
+      const cost = a[i - 1] === b[j - 1] ? 0 : 1;
+      d[i][j] = Math.min(d[i - 1][j] + 1, d[i][j - 1] + 1, d[i - 1][j - 1] + cost);
+      if (i > 1 && j > 1 && a[i - 1] === b[j - 2] && a[i - 2] === b[j - 1]) {
+        d[i][j] = Math.min(d[i][j], d[i - 2][j - 2] + 1);
+      }
+    }
+  }
+  return d[a.length][b.length];
+}
+
+// Troca uma palavra com erro de digitação pela do vocabulário mais próxima (só se for clara);
+// palavra certa, prefixo de uma ("perfum") ou desconhecida fica como está.
+export function correctToken(token: string): string {
+  const word = plain(token);
+  if (word.length < 5 || VOCABULARY.includes(word) || VOCABULARY.some((v) => v.startsWith(word)))
+    return token;
+  const maxDistance = word.length >= 7 ? 2 : 1;
+  let best: string | null = null;
+  let bestDistance = maxDistance + 1;
+  let tie = false;
+  for (const candidate of VOCABULARY) {
+    const distance = editDistance(word, candidate);
+    if (distance < bestDistance) {
+      best = candidate;
+      bestDistance = distance;
+      tie = false;
+    } else if (distance === bestDistance && best !== candidate) {
+      tie = true;
+    }
+  }
+  return best && !tie ? best : token;
+}
+
+// "perfume masculino" vira ['perfume', 'masculino']: CADA palavra precisa combinar (E), senão
+// "perfume masculino" traria hidratante só porque diz "masculino".
+function searchTokens(search: string): string[] {
+  const tokens = search
+    .trim()
+    .split(/\s+/)
+    .filter(Boolean)
+    .map((t) => correctToken(t.toLowerCase()));
+  return [...new Set(tokens)].slice(0, 6);
+}
+
+function normalizeSynonymKey(token: string): string {
+  return token.normalize('NFD').replace(/[̀-ͯ]/g, '');
+}
+
+// Condição SQL (sobre `column`) de "todas as palavras combinam": literal (contém, ou um sinônimo) ou,
+// se `fuzzy`, parecido por similaridade (tolera erro de digitação: "prefume madsculino").
+function allTokensMatch(column: Prisma.Sql, tokens: string[], fuzzy: boolean): Prisma.Sql {
+  const perToken = tokens.map((token) => {
+    const terms = [token, ...(SYNONYMS[normalizeSynonymKey(token)] ?? [])];
+    const parts = terms.map(
+      (t) => Prisma.sql`strpos(unaccent(lower(${column})), unaccent(lower(${t}))) > 0`,
+    );
+    if (fuzzy) {
+      parts.push(
+        Prisma.sql`word_similarity(unaccent(lower(${token})), unaccent(lower(${column}))) > ${FUZZY_THRESHOLD}`,
+      );
+    }
+    return Prisma.sql`(${Prisma.join(parts, ' OR ')})`;
+  });
+  return Prisma.join(perToken, ' AND ');
+}
+
+// Se algum nome combina LITERALMENTE com todas as palavras, mostra só esses: os "parecidos"
+// ("Malbec" ~ "Malva") só entram quando nada combina literalmente (aí servem de "quis dizer").
+function preferLiteral<T extends { literal?: boolean }>(rows: T[]): T[] {
+  const literal = rows.filter((row) => row.literal);
+  return literal.length > 0 ? literal : rows;
+}
+
+// Produtos do catálogo cujo nome COMBINA com `search` (todas as palavras; ver acima). Busca por
+// "contém" sozinha não tolera erro de digitação, e a fuzzy sozinha pontua mal termos curtos (ex.:
+// "deo"): por isso as duas, em OR por palavra. `strpos` (não LIKE): "%"/"_" digitado é texto normal.
+// Com `storeId`, só considera produtos que a loja tem: o teto de FUZZY_LIMIT vale para o resultado
+// DA LOJA, não do catálogo inteiro.
 export async function findFuzzyProductIds(search: string, storeId?: string): Promise<number[]> {
+  const tokens = searchTokens(search);
+  if (tokens.length === 0) return [];
+  const column = Prisma.sql`p.name`;
   const rows = await prisma.$queryRaw<{ id: number; literal?: boolean }[]>`
-    SELECT p.id, strpos(unaccent(lower(p.name)), unaccent(lower(${search}))) > 0 AS literal FROM products p
-    WHERE (
-        strpos(unaccent(lower(p.name)), unaccent(lower(${search}))) > 0
-        OR word_similarity(unaccent(lower(${search})), unaccent(lower(p.name))) > ${FUZZY_THRESHOLD}
-      )
+    SELECT p.id, (${allTokensMatch(column, tokens, false)}) AS literal FROM products p
+    WHERE (${allTokensMatch(column, tokens, true)})
       AND (${storeId ?? null}::text IS NULL OR EXISTS (
         SELECT 1 FROM store_products sp WHERE sp.product_id = p.id AND sp.store_id = ${storeId ?? null}::text
       ))
@@ -56,24 +198,16 @@ export async function findFuzzyProductIds(search: string, storeId?: string): Pro
   return preferLiteral(rows).map((row) => row.id);
 }
 
-// Se algum nome CONTÉM o termo, mostra só esses: os "parecidos" ("Malbec" ~ "Malva") só entram
-// quando nada contém o termo (aí servem de "quis dizer", pra erro de digitação).
-function preferLiteral<T extends { literal?: boolean }>(rows: T[]): T[] {
-  const literal = rows.filter((row) => row.literal);
-  return literal.length > 0 ? literal : rows;
-}
-
-// Mesma busca, mas no nome de um produto MANUAL (kit/cesta — não tem `Product` de catálogo, o nome
-// próprio fica em `StoreProduct.name`). Escopado por loja.
+// Mesma busca, mas no nome de um produto MANUAL (kit/cesta). Escopado por loja.
 export async function findFuzzyStoreProductIds(storeId: string, search: string): Promise<string[]> {
+  const tokens = searchTokens(search);
+  if (tokens.length === 0) return [];
+  const column = Prisma.sql`name`;
   const rows = await prisma.$queryRaw<{ id: string; literal?: boolean }[]>`
-    SELECT id, strpos(unaccent(lower(name)), unaccent(lower(${search}))) > 0 AS literal FROM store_products
+    SELECT id, (${allTokensMatch(column, tokens, false)}) AS literal FROM store_products
     WHERE store_id = ${storeId}
       AND name IS NOT NULL
-      AND (
-        strpos(unaccent(lower(name)), unaccent(lower(${search}))) > 0
-        OR word_similarity(unaccent(lower(${search})), unaccent(lower(name))) > ${FUZZY_THRESHOLD}
-      )
+      AND (${allTokensMatch(column, tokens, true)})
     ORDER BY word_similarity(unaccent(lower(${search})), unaccent(lower(name))) DESC
     LIMIT ${FUZZY_LIMIT}
   `;
