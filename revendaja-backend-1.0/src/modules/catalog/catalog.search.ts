@@ -41,8 +41,8 @@ export function barcodeCandidates(digits: string): string[] {
 // DA LOJA, não do catálogo inteiro (senão um termo comum como "parfum" ou "deo", que casa com
 // milhares de itens, cortava fora o produto da loja antes de o filtro por loja ser aplicado).
 export async function findFuzzyProductIds(search: string, storeId?: string): Promise<number[]> {
-  const rows = await prisma.$queryRaw<{ id: number }[]>`
-    SELECT p.id FROM products p
+  const rows = await prisma.$queryRaw<{ id: number; literal?: boolean }[]>`
+    SELECT p.id, strpos(unaccent(lower(p.name)), unaccent(lower(${search}))) > 0 AS literal FROM products p
     WHERE (
         strpos(unaccent(lower(p.name)), unaccent(lower(${search}))) > 0
         OR word_similarity(unaccent(lower(${search})), unaccent(lower(p.name))) > ${FUZZY_THRESHOLD}
@@ -53,14 +53,21 @@ export async function findFuzzyProductIds(search: string, storeId?: string): Pro
     ORDER BY word_similarity(unaccent(lower(${search})), unaccent(lower(p.name))) DESC
     LIMIT ${FUZZY_LIMIT}
   `;
-  return rows.map((row) => row.id);
+  return preferLiteral(rows).map((row) => row.id);
+}
+
+// Se algum nome CONTÉM o termo, mostra só esses: os "parecidos" ("Malbec" ~ "Malva") só entram
+// quando nada contém o termo (aí servem de "quis dizer", pra erro de digitação).
+function preferLiteral<T extends { literal?: boolean }>(rows: T[]): T[] {
+  const literal = rows.filter((row) => row.literal);
+  return literal.length > 0 ? literal : rows;
 }
 
 // Mesma busca, mas no nome de um produto MANUAL (kit/cesta — não tem `Product` de catálogo, o nome
 // próprio fica em `StoreProduct.name`). Escopado por loja.
 export async function findFuzzyStoreProductIds(storeId: string, search: string): Promise<string[]> {
-  const rows = await prisma.$queryRaw<{ id: string }[]>`
-    SELECT id FROM store_products
+  const rows = await prisma.$queryRaw<{ id: string; literal?: boolean }[]>`
+    SELECT id, strpos(unaccent(lower(name)), unaccent(lower(${search}))) > 0 AS literal FROM store_products
     WHERE store_id = ${storeId}
       AND name IS NOT NULL
       AND (
@@ -70,7 +77,7 @@ export async function findFuzzyStoreProductIds(storeId: string, search: string):
     ORDER BY word_similarity(unaccent(lower(${search})), unaccent(lower(name))) DESC
     LIMIT ${FUZZY_LIMIT}
   `;
-  return rows.map((row) => row.id);
+  return preferLiteral(rows).map((row) => row.id);
 }
 
 // `search` sempre procura no nome (por similaridade, não só "contém" — ver findFuzzyProductIds). Se
