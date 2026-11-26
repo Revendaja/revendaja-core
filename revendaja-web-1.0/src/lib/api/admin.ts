@@ -229,3 +229,15 @@ export function deleteCatalogProduct(id: number, force = false) {
 export function verifyAdminUser(userId: string) {
   return request<null>(`/admin/users/${userId}/verify`, { method: 'POST', auth: true });
 }
+
+export type AdminUnverifiedUser = {
+  id: string;
+  name: string;
+  email: string;
+  whatsapp: string | null;
+  createdAt: string;
+};
+
+export function getAdminUnverifiedUsers() {
+  return request<{ items: AdminUnverifiedUser[] }>('/admin/users/unverified', { auth: true });
+}

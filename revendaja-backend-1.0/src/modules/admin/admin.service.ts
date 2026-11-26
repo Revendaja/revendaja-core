@@ -96,6 +96,10 @@ export class AdminService {
     return { items, page: query.page, pageSize: query.pageSize, total };
   }
 
+  async unverifiedUsers() {
+    return { items: await adminRepository.unverifiedUsers() };
+  }
+
   // Ativa a conta de uma cliente sem o código por e-mail (ex.: caixa de entrada cheia).
   async verifyUser(userId: string): Promise<void> {
     if (!(await adminRepository.verifyUser(userId))) {

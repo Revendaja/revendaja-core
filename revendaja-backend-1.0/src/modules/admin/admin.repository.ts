@@ -396,6 +396,16 @@ export const adminRepository = {
     };
   },
 
+  // Contas que ainda não confirmaram o e-mail (não têm loja, pois ela só nasce depois disso).
+  async unverifiedUsers() {
+    return prisma.user.findMany({
+      where: { ...REAL_USER_WHERE, phoneVerifiedAt: null },
+      orderBy: { createdAt: 'desc' },
+      take: 200,
+      select: { id: true, name: true, email: true, whatsapp: true, createdAt: true },
+    });
+  },
+
   // Marca o e-mail da dona como verificado, sem código. Só preenche se ainda estiver vazio, então
   // repetir o clique não muda a data original. Devolve false se a conta não existe.
   async verifyUser(userId: string): Promise<boolean> {

@@ -15,6 +15,7 @@ jest.mock('../../../database/prisma', () => ({
 const overview = jest.fn();
 const stores = jest.fn();
 const verifyUser = jest.fn();
+const unverifiedUsers = jest.fn();
 const ai = jest.fn();
 const plans = jest.fn();
 const system = jest.fn();
@@ -27,6 +28,7 @@ jest.mock('../admin.service', () => ({
     overview: (...args: unknown[]) => overview(...args),
     stores: (...args: unknown[]) => stores(...args),
     verifyUser: (...args: unknown[]) => verifyUser(...args),
+    unverifiedUsers: (...args: unknown[]) => unverifiedUsers(...args),
     ai: (...args: unknown[]) => ai(...args),
     plans: (...args: unknown[]) => plans(...args),
     system: (...args: unknown[]) => system(...args),
@@ -66,6 +68,7 @@ beforeEach(() => {
     overview,
     stores,
     verifyUser,
+    unverifiedUsers,
     ai,
     plans,
     system,
@@ -232,6 +235,12 @@ describe('painel da administradora', () => {
       await app.close();
       return response;
     }
+
+    it('GET /admin/users/unverified lista as contas pendentes (só admin)', async () => {
+      unverifiedUsers.mockResolvedValue({ items: [] });
+      expect((await get('/admin/users/unverified', ADMIN_TOKEN)).statusCode).toBe(200);
+      expect((await get('/admin/users/unverified', USER_TOKEN)).statusCode).toBe(403);
+    });
 
     it('POST /admin/users/:id/verify ativa (204) e repassa o id', async () => {
       verifyUser.mockResolvedValue(undefined);

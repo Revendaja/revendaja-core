@@ -2,7 +2,7 @@
 
 import { useState } from 'react';
 import { keepPreviousData, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { getAdminStores, verifyAdminUser, type AdminPlanId, type AdminStoreSort } from '@/lib/api/admin';
+import { getAdminStores, getAdminUnverifiedUsers, verifyAdminUser, type AdminPlanId, type AdminStoreSort } from '@/lib/api/admin';
 import { getErrorMessage } from '@/lib/api/errors';
 import { useDebouncedValue } from '@/hooks/useDebouncedValue';
 import { formatWhatsapp, whatsappUrl } from '@/lib/utils/format';
@@ -50,7 +50,11 @@ export default function AdminStoresPage() {
   const queryClient = useQueryClient();
   const verify = useMutation({
     mutationFn: verifyAdminUser,
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['admin', 'stores'] }),
+    onSuccess: () =>
+      Promise.all([
+        queryClient.invalidateQueries({ queryKey: ['admin', 'stores'] }),
+        queryClient.invalidateQueries({ queryKey: ['admin', 'unverified'] }),
+      ]),
   });
   const debouncedSearch = useDebouncedValue(search.trim());
 
@@ -61,6 +65,8 @@ export default function AdminStoresPage() {
     placeholderData: keepPreviousData,
   });
 
+  const unverified = useQuery({ queryKey: ['admin', 'unverified'], queryFn: getAdminUnverifiedUsers });
+
   const total = query.data?.total ?? 0;
   const pages = Math.max(1, Math.ceil(total / PAGE_SIZE));
 
@@ -70,6 +76,42 @@ export default function AdminStoresPage() {
         title="Lojas e clientes"
         subtitle="Quem são suas clientes, em que plano estão, se estão vendendo e quanto usam a IA."
       />
+
+      {unverified.data && unverified.data.items.length > 0 && (
+        <Card className="p-0">
+          <p className="px-3 pt-3 text-[13px] font-medium text-ink-900">
+            Contas aguardando verificação ({unverified.data.items.length})
+          </p>
+          <Table head={['Nome', 'E-mail', 'WhatsApp', 'Cadastro', '']}>
+            {unverified.data.items.map((user) => {
+              const pending = verify.isPending && verify.variables === user.id;
+              return (
+                <tr key={user.id} className="hover:bg-ink-50/60">
+                  <td className="px-3 py-2.5 text-ink-800">{user.name}</td>
+                  <td className="px-3 py-2.5 text-ink-500">{user.email}</td>
+                  <td className="px-3 py-2.5 text-ink-500">{user.whatsapp ? formatWhatsapp(user.whatsapp) : '—'}</td>
+                  <td className="px-3 py-2.5 text-ink-500">{formatDay(user.createdAt)}</td>
+                  <td className="px-3 py-2.5 text-right">
+                    <button
+                      type="button"
+                      disabled={pending}
+                      onClick={() => {
+                        if (window.confirm(`Ativar a conta de ${user.email} sem o código?`)) verify.mutate(user.id);
+                      }}
+                      className="rounded-md border border-primary-500 px-2.5 py-1 text-[12px] font-medium text-primary-600 hover:bg-primary-50 disabled:opacity-50"
+                    >
+                      {pending ? 'Ativando…' : 'Ativar conta'}
+                    </button>
+                    {verify.isError && verify.variables === user.id && (
+                      <p className="mt-0.5 text-[11px] text-danger">{getErrorMessage(verify.error)}</p>
+                    )}
+                  </td>
+                </tr>
+              );
+            })}
+          </Table>
+        </Card>
+      )}
 
       <div className="flex flex-wrap items-center gap-2">
         <input

@@ -62,6 +62,16 @@ export async function adminRoutes(app: FastifyInstance): Promise<void> {
       reply.send(await adminService.stores(request.query)),
   );
 
+  server.get(
+    '/admin/users/unverified',
+    {
+      preHandler,
+      schema: { ...base, summary: 'Contas que ainda não verificaram o e-mail (ainda sem loja).' },
+    },
+    async (_request: FastifyRequest, reply: FastifyReply) =>
+      reply.send(await adminService.unverifiedUsers()),
+  );
+
   server.post(
     '/admin/users/:id/verify',
     {
