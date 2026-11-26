@@ -57,6 +57,7 @@ export type AdminStore = {
   cancelAtPeriodEnd: boolean;
   currentPeriodEnd: string | null;
   createdAt: string;
+  ownerId: string;
   ownerName: string;
   ownerEmail: string;
   ownerWhatsapp: string | null;
@@ -222,4 +223,9 @@ export function updateCatalogProduct(id: number, input: UpdateCatalogProduct) {
 // Sem `force`, produto que alguma loja usa devolve 409 (a mensagem diz em quantas lojas).
 export function deleteCatalogProduct(id: number, force = false) {
   return request<null>(`/admin/catalog/products/${id}${force ? '?force=true' : ''}`, { method: 'DELETE', auth: true });
+}
+
+// Ativa a conta da cliente sem o código por e-mail.
+export function verifyAdminUser(userId: string) {
+  return request<null>(`/admin/users/${userId}/verify`, { method: 'POST', auth: true });
 }

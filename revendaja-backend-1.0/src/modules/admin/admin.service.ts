@@ -96,6 +96,13 @@ export class AdminService {
     return { items, page: query.page, pageSize: query.pageSize, total };
   }
 
+  // Ativa a conta de uma cliente sem o código por e-mail (ex.: caixa de entrada cheia).
+  async verifyUser(userId: string): Promise<void> {
+    if (!(await adminRepository.verifyUser(userId))) {
+      throw new NotFoundError('Conta não encontrada.');
+    }
+  }
+
   async ai(query: AdminAiQuery) {
     const period = query.period ?? usagePeriod().key;
     const [totals, history, byStore, byPlan] = await Promise.all([

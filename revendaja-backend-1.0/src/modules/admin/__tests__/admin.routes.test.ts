@@ -14,6 +14,7 @@ jest.mock('../../../database/prisma', () => ({
 
 const overview = jest.fn();
 const stores = jest.fn();
+const verifyUser = jest.fn();
 const ai = jest.fn();
 const plans = jest.fn();
 const system = jest.fn();
@@ -25,6 +26,7 @@ jest.mock('../admin.service', () => ({
   adminService: {
     overview: (...args: unknown[]) => overview(...args),
     stores: (...args: unknown[]) => stores(...args),
+    verifyUser: (...args: unknown[]) => verifyUser(...args),
     ai: (...args: unknown[]) => ai(...args),
     plans: (...args: unknown[]) => plans(...args),
     system: (...args: unknown[]) => system(...args),
@@ -63,6 +65,7 @@ beforeEach(() => {
     userFindUnique,
     overview,
     stores,
+    verifyUser,
     ai,
     plans,
     system,
@@ -213,6 +216,34 @@ describe('painel da administradora', () => {
     it('DELETE: 403 para quem não é admin', async () => {
       expect((await call('DELETE', '/admin/catalog/products/7', USER_TOKEN)).statusCode).toBe(403);
       expect(deleteCatalogProduct).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('ativar conta sem código', () => {
+    const ID = '6f1c2d3e-4a5b-4c6d-8e7f-0a1b2c3d4e5f';
+
+    async function call(method: 'POST', url: string, token?: string) {
+      const app = await buildApp();
+      const response = await app.inject({
+        method,
+        url,
+        headers: token ? { authorization: `Bearer ${token}` } : {},
+      });
+      await app.close();
+      return response;
+    }
+
+    it('POST /admin/users/:id/verify ativa (204) e repassa o id', async () => {
+      verifyUser.mockResolvedValue(undefined);
+      expect((await call('POST', `/admin/users/${ID}/verify`, ADMIN_TOKEN)).statusCode).toBe(204);
+      expect(verifyUser).toHaveBeenCalledWith(ID);
+    });
+
+    it('recusa id inválido (400), não-admin (403) e sem login (401)', async () => {
+      expect((await call('POST', '/admin/users/abc/verify', ADMIN_TOKEN)).statusCode).toBe(400);
+      expect((await call('POST', `/admin/users/${ID}/verify`, USER_TOKEN)).statusCode).toBe(403);
+      expect((await call('POST', `/admin/users/${ID}/verify`)).statusCode).toBe(401);
+      expect(verifyUser).not.toHaveBeenCalled();
     });
   });
 });

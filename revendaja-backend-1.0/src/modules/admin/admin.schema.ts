@@ -69,3 +69,5 @@ export type AdminUpdateCatalogProduct = z.infer<typeof adminUpdateCatalogProduct
 export type AdminCreateCatalogProduct = z.infer<typeof adminCreateCatalogProductSchema>;
 export type AdminStoresQuery = z.infer<typeof adminStoresQuerySchema>;
 export type AdminAiQuery = z.infer<typeof adminAiQuerySchema>;
+
+export const adminUserParamsSchema = z.object({ id: z.string().uuid() });

@@ -9,6 +9,7 @@ import {
   adminDeleteCatalogProductQuerySchema,
   adminUpdateCatalogProductSchema,
   adminStoresQuerySchema,
+  adminUserParamsSchema,
 } from './admin.schema';
 import type {
   AdminAiQuery,
@@ -59,6 +60,23 @@ export async function adminRoutes(app: FastifyInstance): Promise<void> {
     },
     async (request: FastifyRequest<{ Querystring: AdminStoresQuery }>, reply: FastifyReply) =>
       reply.send(await adminService.stores(request.query)),
+  );
+
+  server.post(
+    '/admin/users/:id/verify',
+    {
+      preHandler,
+      schema: {
+        ...base,
+        summary:
+          'Ativa a conta de uma cliente (marca o e-mail como verificado) sem exigir o código.',
+        params: adminUserParamsSchema,
+      },
+    },
+    async (request: FastifyRequest<{ Params: { id: string } }>, reply: FastifyReply) => {
+      await adminService.verifyUser(request.params.id);
+      return reply.status(204).send();
+    },
   );
 
   server.get(

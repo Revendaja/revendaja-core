@@ -52,6 +52,7 @@ export interface StoreRow {
   cancelAtPeriodEnd: boolean;
   currentPeriodEnd: Date | null;
   createdAt: Date;
+  ownerId: string;
   ownerName: string;
   ownerEmail: string;
   ownerWhatsapp: string | null;
@@ -323,6 +324,7 @@ export const adminRepository = {
           cancel_at_period_end: boolean;
           current_period_end: Date | null;
           created_at: Date;
+          owner_id: string;
           owner_name: string;
           owner_email: string;
           owner_whatsapp: string | null;
@@ -338,7 +340,7 @@ export const adminRepository = {
         SELECT
           s.id, s.store_name, s.handle, s.plan::text AS plan, s.is_online, s.subscription_status,
           s.cancel_at_period_end, s.current_period_end, s.created_at,
-          u.name AS owner_name, u.email AS owner_email, u.whatsapp AS owner_whatsapp,
+          u.id AS owner_id, u.name AS owner_name, u.email AS owner_email, u.whatsapp AS owner_whatsapp,
           (u.phone_verified_at IS NOT NULL) AS verified,
           (SELECT COUNT(*) FROM store_products sp WHERE sp.store_id = s.id) AS products,
           COALESCE(sa.sales30, 0) AS sales30,
@@ -379,6 +381,7 @@ export const adminRepository = {
         cancelAtPeriodEnd: row.cancel_at_period_end,
         currentPeriodEnd: row.current_period_end,
         createdAt: row.created_at,
+        ownerId: row.owner_id,
         ownerName: row.owner_name,
         ownerEmail: row.owner_email,
         ownerWhatsapp: row.owner_whatsapp,
@@ -391,6 +394,17 @@ export const adminRepository = {
         aiTokens: n(row.ai_tokens),
       })),
     };
+  },
+
+  // Marca o e-mail da dona como verificado, sem código. Só preenche se ainda estiver vazio, então
+  // repetir o clique não muda a data original. Devolve false se a conta não existe.
+  async verifyUser(userId: string): Promise<boolean> {
+    const { count } = await prisma.user.updateMany({
+      where: { id: userId, phoneVerifiedAt: null },
+      data: { phoneVerifiedAt: new Date() },
+    });
+    if (count > 0) return true;
+    return (await prisma.user.count({ where: { id: userId } })) > 0;
   },
 
   async dbPing(): Promise<number> {

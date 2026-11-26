@@ -1,8 +1,8 @@
 'use client';
 
 import { useState } from 'react';
-import { keepPreviousData, useQuery } from '@tanstack/react-query';
-import { getAdminStores, type AdminPlanId, type AdminStoreSort } from '@/lib/api/admin';
+import { keepPreviousData, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { getAdminStores, verifyAdminUser, type AdminPlanId, type AdminStoreSort } from '@/lib/api/admin';
 import { getErrorMessage } from '@/lib/api/errors';
 import { useDebouncedValue } from '@/hooks/useDebouncedValue';
 import { formatWhatsapp, whatsappUrl } from '@/lib/utils/format';
@@ -47,6 +47,11 @@ export default function AdminStoresPage() {
   const [plan, setPlan] = useState<AdminPlanId | ''>('');
   const [sort, setSort] = useState<AdminStoreSort>('created');
   const [page, setPage] = useState(1);
+  const queryClient = useQueryClient();
+  const verify = useMutation({
+    mutationFn: verifyAdminUser,
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['admin', 'stores'] }),
+  });
   const debouncedSearch = useDebouncedValue(search.trim());
 
   const params = { search: debouncedSearch || undefined, plan: plan || undefined, sort, page, pageSize: PAGE_SIZE };
@@ -148,7 +153,26 @@ export default function AdminStoresPage() {
                       {formatWhatsapp(store.ownerWhatsapp)}
                     </a>
                   )}
-                  {!store.verified && <p className="mt-0.5"><Badge tone="warn">e-mail não verificado</Badge></p>}
+                  {!store.verified && (
+                    <div className="mt-0.5 flex flex-wrap items-center gap-1.5">
+                      <Badge tone="warn">e-mail não verificado</Badge>
+                      <button
+                        type="button"
+                        disabled={verify.isPending && verify.variables === store.ownerId}
+                        onClick={() => {
+                          if (window.confirm(`Ativar a conta de ${store.ownerEmail} sem o código?`)) {
+                            verify.mutate(store.ownerId);
+                          }
+                        }}
+                        className="rounded-md border border-primary-500 px-2 py-0.5 text-[11px] font-medium text-primary-600 hover:bg-primary-50 disabled:opacity-50"
+                      >
+                        {verify.isPending && verify.variables === store.ownerId ? 'Ativando…' : 'Ativar conta'}
+                      </button>
+                    </div>
+                  )}
+                  {verify.isError && verify.variables === store.ownerId && (
+                    <p className="mt-0.5 text-[11px] text-danger">{getErrorMessage(verify.error)}</p>
+                  )}
                 </td>
                 <td className="px-3 py-2.5">
                   <PlanBadge plan={store.plan} />

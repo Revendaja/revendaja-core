@@ -1,0 +1,9 @@
+Novidades do RevendaJá:
+• Escolha a data da venda direto no calendário, no canto da tela
+• Pague com cartão de crédito ou de débito
+• Crie cupons de desconto e aplique descontos nas vendas
+• Exclua vendas com confirmação
+• Busca de produtos mais precisa e histórico de pesquisas
+• Seus clientes podem favoritar produtos
+• Nova marca Odorata no catálogo
+• Mais estabilidade e melhorias gerais

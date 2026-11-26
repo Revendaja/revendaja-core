@@ -1,5 +1,5 @@
 import React, { useMemo, useRef, useState } from 'react';
-import { View, Text, ScrollView, Pressable, TextInput, Alert, ActivityIndicator, KeyboardAvoidingView, Platform } from 'react-native';
+import { View, Text, ScrollView, Pressable, TextInput, Alert, Animated, Modal,ActivityIndicator, KeyboardAvoidingView, Platform } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
@@ -19,13 +19,28 @@ import { useStoreAccessGuard } from '../../products/useStoreAccessGuard';
 import { useStoreProducts } from '../../products/StoreProductsContext';
 import { formatCurrency } from '../../utils/format';
 import { createSaleAttemptTracker, isDefinitiveRejection, saleContentKey } from '../../utils/saleAttempt';
-import { maskDate, parseSaleDate, PAYMENT_CHIPS, PAYMENT_ICON, roundMoney } from '../../utils/sales';
+import DateTimePicker, { type DateTimePickerEvent } from '@react-native-community/datetimepicker';
+import { parseSaleDate, PAYMENT_ICON, roundMoney } from '../../utils/sales';
 import { newRequestId } from '../../utils/uuid';
 import type { RootTabParamList } from '../../navigation/types';
 
 type Props = BottomTabScreenProps<RootTabParamList, 'NovaVenda'>;
 
 type CartLine = { item: StoreProduct; quantity: number };
+
+// Cartão de crédito e de débito: ambos viram `card` na API (o débito vai à vista, 1x).
+const SALE_PAYMENT_CHIPS: {
+  key: string;
+  method: NewSalePaymentMethod;
+  kind?: 'credit' | 'debit';
+  full: string;
+  icon: keyof typeof Ionicons.glyphMap;
+}[] = [
+  { key: 'pix', method: 'pix', full: 'Pix', icon: PAYMENT_ICON.pix },
+  { key: 'credit', method: 'card', kind: 'credit', full: 'Cartão de crédito', icon: 'card' },
+  { key: 'debit', method: 'card', kind: 'debit', full: 'Cartão de débito', icon: 'card-outline' },
+  { key: 'cash', method: 'cash', full: 'Dinheiro', icon: PAYMENT_ICON.cash },
+];
 
 const CUSTOMER_NAME_MAX = 120;
 const MAX_CART_ITEMS = 50;
@@ -47,7 +62,23 @@ export default function NewSaleScreen({ navigation }: Props) {
   const [paymentMethod, setPaymentMethod] = useState<NewSalePaymentMethod>('pix');
   const [cart, setCart] = useState<CartLine[]>([]);
   const [nameError, setNameError] = useState<string | null>(null);
+  const [cardKind, setCardKind] = useState<'credit' | 'debit'>('credit');
+  const [paymentPickerVisible, setPaymentPickerVisible] = useState(false);
+  const pickerProgress = useRef(new Animated.Value(0)).current;
+  function openPaymentPicker() {
+    setPaymentPickerVisible(true);
+    Animated.timing(pickerProgress, { toValue: 1, duration: 220, useNativeDriver: true }).start();
+  }
+  function closePaymentPicker() {
+    Animated.timing(pickerProgress, { toValue: 0, duration: 180, useNativeDriver: true }).start(({ finished }) => {
+      if (finished) setPaymentPickerVisible(false);
+    });
+  }
+  const selectedChip =
+    SALE_PAYMENT_CHIPS.find((c) => c.method === paymentMethod && (c.method !== 'card' || c.kind === cardKind)) ??
+    SALE_PAYMENT_CHIPS[0];
   const [saleDate, setSaleDate] = useState('');
+  const [datePickerVisible, setDatePickerVisible] = useState(false);
   const [dateError, setDateError] = useState<string | null>(null);
   const [formError, setFormError] = useState<string | null>(null);
 
@@ -175,9 +206,27 @@ export default function NewSaleScreen({ navigation }: Props) {
     void addByCode(code);
   }
 
+  // Data atual do campo (DD/MM/AAAA) como Date para abrir o seletor já nela; vazio = hoje.
+  function pickerValue(): Date {
+    const m = /^(\d{2})\/(\d{2})\/(\d{4})$/.exec(saleDate);
+    return m ? new Date(Number(m[3]), Number(m[2]) - 1, Number(m[1])) : new Date();
+  }
+
+  function handleDatePicked(event: DateTimePickerEvent, date?: Date) {
+    setDatePickerVisible(false);
+    if (event.type !== 'set' || !date) return;
+    const pad = (n: number) => String(n).padStart(2, '0');
+    const picked = `${pad(date.getDate())}/${pad(date.getMonth() + 1)}/${date.getFullYear()}`;
+    const today = new Date();
+    const isToday = date.getFullYear() === today.getFullYear() && date.getMonth() === today.getMonth() && date.getDate() === today.getDate();
+    setSaleDate(isToday ? '' : picked);
+    setDateError(null);
+  }
+
   function resetForm() {
     setCustomerName('');
     setPaymentMethod('pix');
+    setCardKind('credit');
     setCart([]);
     setProductQuery('');
     commitQuery('');
@@ -215,6 +264,8 @@ export default function NewSaleScreen({ navigation }: Props) {
     const content: Omit<CreateSaleInput, 'clientRequestId'> = {
       customerName: name,
       paymentMethod,
+      // Débito é sempre à vista; o crédito segue como o cartão já era (1x).
+      ...(paymentMethod === 'card' && cardKind === 'debit' ? { installments: 1 } : {}),
       ...(parsedDate.iso ? { soldAt: parsedDate.iso } : {}),
       items: cart.map((line) => ({ storeProductId: line.item.id, quantity: line.quantity })),
     };
@@ -259,7 +310,69 @@ export default function NewSaleScreen({ navigation }: Props) {
           contentContainerStyle={{ padding: 20, paddingBottom: 20 }}
           keyboardShouldPersistTaps="handled"
         >
-          <Text className="text-2xl font-extrabold text-ink-900 mb-4">Nova Venda</Text>
+          <View className="flex-row items-center justify-between mb-4">
+            <Text className="text-2xl font-extrabold text-ink-900">Nova Venda</Text>
+            <View className="flex-row items-center" style={{ gap: 8 }}>
+              {!!saleDate && (
+                <Pressable
+                  onPress={() => {
+                    setSaleDate('');
+                    setDateError(null);
+                  }}
+                  disabled={loading}
+                  hitSlop={8}
+                  accessibilityRole="button"
+                  accessibilityLabel="Voltar a data da venda para hoje"
+                  className="flex-row items-center gap-1 bg-primary-500/10 rounded-full px-2.5 py-1.5"
+                >
+                  <Text className="text-xs font-bold text-primary-500">{saleDate}</Text>
+                  <Ionicons name="close-circle" size={14} color="#FF6B00" />
+                </Pressable>
+              )}
+              <Pressable
+                onPress={() => setDatePickerVisible(true)}
+                disabled={loading}
+                hitSlop={8}
+                accessibilityRole="button"
+                accessibilityLabel="Alterar a data da venda"
+                className="w-10 h-10 rounded-full bg-white items-center justify-center"
+              >
+                <Ionicons name="calendar-outline" size={20} color="#FF6B00" />
+              </Pressable>
+            </View>
+          </View>
+
+          {/* iOS: calendário em popup (não ocupa espaço no layout). Android: diálogo nativo. */}
+          {datePickerVisible && Platform.OS === 'ios' && (
+            <Modal transparent animationType="fade" onRequestClose={() => setDatePickerVisible(false)}>
+              <Pressable
+                className="flex-1 items-center justify-center px-5"
+                style={{ backgroundColor: 'rgba(0,0,0,0.35)' }}
+                onPress={() => setDatePickerVisible(false)}
+              >
+                <Pressable className="bg-white rounded-3xl p-3 w-full" onPress={() => {}}>
+                  <DateTimePicker
+                    value={pickerValue()}
+                    mode="date"
+                    display="inline"
+                    accentColor="#FF6B00"
+                    themeVariant="light"
+                    locale="pt-BR"
+                    maximumDate={new Date()}
+                    onChange={handleDatePicked}
+                  />
+                </Pressable>
+              </Pressable>
+            </Modal>
+          )}
+          {datePickerVisible && Platform.OS !== 'ios' && (
+            <DateTimePicker value={pickerValue()} mode="date" maximumDate={new Date()} onChange={handleDatePicked} />
+          )}
+          {!!dateError && (
+            <Text className="text-xs text-danger mb-3" accessibilityLiveRegion="polite">
+              {dateError}
+            </Text>
+          )}
 
           {formError && <Banner type="error" message={formError} />}
 
@@ -286,48 +399,68 @@ export default function NewSaleScreen({ navigation }: Props) {
           )}
 
           <Text className="text-xs font-bold text-ink-500 mb-1.5 mt-4">Forma de pagamento</Text>
-          <View className="flex-row flex-wrap" style={{ gap: 8 }}>
-            {PAYMENT_CHIPS.map(({ method, label }) => {
-              const active = method === paymentMethod;
-              return (
-                <Pressable
-                  key={method}
-                  onPress={() => setPaymentMethod(method)}
-                  disabled={loading}
-                  accessibilityRole="button"
-                  accessibilityState={{ selected: active }}
-                  className={`flex-row items-center gap-1.5 px-3.5 py-2.5 rounded-full ${
-                    active ? 'bg-primary-500' : 'bg-white'
-                  }`}
-                >
-                  <Ionicons name={PAYMENT_ICON[method]} size={15} color={active ? '#fff' : '#8B8FA3'} />
-                  <Text className={`text-xs font-bold ${active ? 'text-white' : 'text-ink-500'}`}>{label}</Text>
-                </Pressable>
-              );
-            })}
-          </View>
+          <Pressable
+            onPress={() => openPaymentPicker()}
+            disabled={loading}
+            accessibilityRole="button"
+            accessibilityLabel={`Forma de pagamento: ${selectedChip.full}. Toque para alterar`}
+            className="flex-row items-center bg-white rounded-xl px-3 h-12"
+            style={{ gap: 10 }}
+          >
+            <Ionicons name={selectedChip.icon} size={18} color="#FF6B00" />
+            <Text className="flex-1 text-sm text-ink-900">{selectedChip.full}</Text>
+            <Ionicons name="chevron-down" size={18} color="#8B8FA3" />
+          </Pressable>
 
-          <Text className="text-xs font-bold text-ink-500 mb-1.5 mt-4">Data da venda (opcional)</Text>
-          <TextInput
-            value={saleDate}
-            onChangeText={(text) => {
-              setSaleDate(maskDate(text));
-              if (dateError) setDateError(null);
-            }}
-            placeholder="Hoje — ou DD/MM/AAAA"
-            placeholderTextColor="#8B8FA3"
-            keyboardType="number-pad"
-            maxLength={10}
-            editable={!loading}
-            accessibilityLabel="Data da venda"
-            className="bg-white rounded-xl px-4 h-12 text-sm text-ink-900"
-            style={{ borderWidth: 1.5, borderColor: dateError ? '#E0453F' : 'transparent' }}
-          />
-          {!!dateError && (
-            <Text className="text-xs text-danger mt-1.5" accessibilityLiveRegion="polite">
-              {dateError}
-            </Text>
-          )}
+          <Modal
+            visible={paymentPickerVisible}
+            transparent
+            animationType="none"
+            onRequestClose={() => closePaymentPicker()}
+          >
+            <View className="flex-1 justify-end">
+              {/* O fundo escuro só faz fade; apenas a folha sobe. */}
+              <Animated.View
+                pointerEvents="none"
+                style={{ position: 'absolute', top: 0, bottom: 0, left: 0, right: 0, backgroundColor: 'rgba(0,0,0,0.35)', opacity: pickerProgress }}
+              />
+              <Pressable style={{ position: 'absolute', top: 0, bottom: 0, left: 0, right: 0 }} onPress={() => closePaymentPicker()} />
+              <Animated.View
+                style={{
+                  transform: [{ translateY: pickerProgress.interpolate({ inputRange: [0, 1], outputRange: [420, 0] }) }],
+                }}
+              >
+              <Pressable
+                className="bg-white rounded-t-3xl px-5 pt-5"
+                style={{ paddingBottom: insets.bottom + 16 }}
+                onPress={() => {}}
+              >
+                <Text className="text-base font-extrabold text-ink-900 mb-2">Forma de pagamento</Text>
+                {SALE_PAYMENT_CHIPS.map(({ key, method, kind, full, icon }) => {
+                  const active = method === paymentMethod && (method !== 'card' || kind === cardKind);
+                  return (
+                    <Pressable
+                      key={key}
+                      onPress={() => {
+                        setPaymentMethod(method);
+                        if (kind) setCardKind(kind);
+                        closePaymentPicker();
+                      }}
+                      accessibilityRole="button"
+                      accessibilityState={{ selected: active }}
+                      className="flex-row items-center py-3.5"
+                      style={{ gap: 12 }}
+                    >
+                      <Ionicons name={icon} size={20} color={active ? '#FF6B00' : '#8B8FA3'} />
+                      <Text className={`flex-1 text-sm ${active ? 'font-bold text-ink-900' : 'text-ink-700'}`}>{full}</Text>
+                      {active && <Ionicons name="checkmark" size={20} color="#FF6B00" />}
+                    </Pressable>
+                  );
+                })}
+              </Pressable>
+              </Animated.View>
+            </View>
+          </Modal>
 
           <Text className="text-xs font-bold text-ink-500 mb-1.5 mt-4">Adicionar produto</Text>
           <View className="flex-row items-center gap-2 mb-1">
